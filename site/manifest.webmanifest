@@ -1,0 +1,20 @@
+{
+  "name": "Frontend Mastery — Lý thuyết & Thực hành",
+  "short_name": "FE Mastery",
+  "description": "Lộ trình học frontend chuyên sâu: browser internals, performance, browser APIs, kiến trúc, PWA và hơn thế.",
+  "lang": "vi",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

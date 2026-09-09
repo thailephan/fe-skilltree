@@ -1,0 +1,804 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6366f1">
+<meta name="description" content="Lộ trình học frontend chuyên sâu: browser internals, performance, browser APIs, kiến trúc, PWA.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="FE Mastery">
+<title>Frontend Mastery — Lý thuyết & Thực hành</title>
+<style>
+  :root {
+    --ground: #ffffff;
+    --panel: #f7f8fb;
+    --panel-2: #eef1f7;
+    --ink: #1a2233;
+    --ink-soft: #4a5568;
+    --ink-faint: #8a93a6;
+    --line: #e4e8f0;
+    --line-strong: #d3d9e4;
+    --warn: #d97706;
+    --warn-bg: #fef6e7;
+    --warn-line: #f4d58a;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --accent: #6366f1;
+    --accent-soft: #eef0fe;
+    --radius: 14px;
+    --sidebar-w: 320px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--ink);
+    background: var(--ground);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; animation: none !important; }
+  }
+
+  /* ---------- Layout ---------- */
+  .app { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: var(--sidebar-w);
+    flex: 0 0 var(--sidebar-w);
+    border-right: 1px solid var(--line);
+    background: var(--ground);
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 30;
+  }
+  .brand {
+    padding: 22px 22px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand h1 {
+    font-size: 17px;
+    margin: 0;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+  .brand .kicker {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 7px;
+  }
+  .progress-wrap { margin-top: 14px; }
+  .progress-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .progress-row b { color: var(--ink); font-size: 12px; }
+  .bar { height: 6px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
+  .bar > i {
+    display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, #6366f1, #0ea5e9, #10b981, #f59e0b, #ec4899);
+    border-radius: 99px; transition: width .4s ease;
+  }
+
+  .search { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .search input {
+    width: 100%; border: 1px solid var(--line-strong); border-radius: 9px;
+    padding: 8px 11px; font-size: 13px; font-family: var(--font-sans);
+    background: var(--panel); color: var(--ink); outline: none;
+  }
+  .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .nav { overflow-y: auto; padding: 10px 10px 40px; flex: 1; }
+  .nav-item { margin-bottom: 2px; }
+  .phase-btn {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    background: none; border: none; cursor: pointer; text-align: left;
+    padding: 9px 10px; border-radius: 9px; color: var(--ink); font-family: var(--font-sans);
+    transition: background .15s;
+  }
+  .phase-btn:hover { background: var(--panel); }
+  .phase-btn .dot { width: 9px; height: 9px; border-radius: 3px; flex: 0 0 auto; background: var(--pc, #ccc); }
+  .phase-btn .pt { flex: 1; font-weight: 650; font-size: 13.5px; }
+  .phase-btn .pn { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); }
+  .phase-btn .chev { transition: transform .2s; color: var(--ink-faint); }
+  .nav-item.open .chev { transform: rotate(90deg); }
+
+  .lessons { display: none; padding: 2px 0 8px 28px; }
+  .nav-item.open .lessons { display: block; }
+  .lesson-btn {
+    width: 100%; display: flex; align-items: center; gap: 9px;
+    background: none; border: none; cursor: pointer; text-align: left;
+    padding: 7px 10px; border-radius: 8px; color: var(--ink-soft);
+    font-size: 12.5px; font-family: var(--font-sans); transition: background .15s, color .15s;
+    position: relative;
+  }
+  .lesson-btn:hover { background: var(--panel); color: var(--ink); }
+  .lesson-btn.active { background: var(--pc-soft, var(--panel-2)); color: var(--ink); font-weight: 650; }
+  .lesson-btn.active::before {
+    content: ""; position: absolute; left: -18px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 16px; border-radius: 3px; background: var(--pc, var(--accent));
+  }
+  .lesson-btn .ln { font-family: var(--font-mono); font-size: 10px; color: var(--ink-faint); flex: 0 0 auto; }
+  .lesson-btn .check {
+    width: 15px; height: 15px; flex: 0 0 auto; border-radius: 50%;
+    border: 1.5px solid var(--line-strong); display: grid; place-items: center;
+  }
+  .lesson-btn.done .check { background: var(--pc, var(--accent)); border-color: var(--pc, var(--accent)); }
+  .lesson-btn.done .check svg { display: block; }
+  .lesson-btn .check svg { display: none; }
+  .lesson-btn.done .lt { color: var(--ink-faint); text-decoration: line-through; }
+  .lesson-btn .lt { flex: 1; }
+
+  /* ---------- Main ---------- */
+  .main { flex: 1; min-width: 0; }
+  .content { max-width: 820px; margin: 0 auto; padding: 46px 40px 120px; }
+  .content.fade { animation: fade .3s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .topbar { display: none; }
+
+  /* Lesson header */
+  .lh-kicker {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+    background: var(--accent-soft); padding: 5px 11px; border-radius: 99px;
+  }
+  .lh-kicker .dot { width: 7px; height: 7px; border-radius: 2px; background: var(--accent); }
+  h2.lh-title {
+    font-size: 33px; line-height: 1.15; letter-spacing: -0.025em; font-weight: 820;
+    margin: 16px 0 0; text-wrap: balance;
+  }
+
+  section.block { margin-top: 34px; }
+  .block-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 13px;
+  }
+  .block-ico {
+    width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto;
+    display: grid; place-items: center; color: #fff;
+  }
+  .block-ico svg { width: 17px; height: 17px; }
+  .block-head h3 {
+    margin: 0; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--ink-soft); font-weight: 700;
+  }
+
+  .context {
+    background: var(--accent-soft); border-left: 3px solid var(--accent);
+    padding: 16px 20px; border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 15.5px; color: #2a3348;
+  }
+
+  ul.clean, ol.tasks { margin: 0; padding: 0; list-style: none; }
+  ul.clean li {
+    position: relative; padding: 6px 0 6px 28px; font-size: 15px; color: var(--ink-soft);
+  }
+  ul.clean li::before {
+    content: ""; position: absolute; left: 4px; top: 13px;
+    width: 8px; height: 8px; border-radius: 2px; background: var(--accent);
+  }
+  ol.tasks { counter-reset: t; display: flex; flex-direction: column; gap: 11px; }
+  ol.tasks li {
+    counter-increment: t; position: relative; padding: 13px 16px 13px 50px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+    font-size: 14.5px; color: var(--ink);
+  }
+  ol.tasks li::before {
+    content: counter(t); position: absolute; left: 13px; top: 12px;
+    width: 24px; height: 24px; border-radius: 7px; background: var(--accent); color: #fff;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  ol.tasks li code, ul.clean li code, .context code, .hints code, .crit label code {
+    font-family: var(--font-mono); font-size: 0.86em; background: var(--panel-2);
+    padding: 1.5px 5px; border-radius: 5px; color: #b23; word-break: break-word;
+  }
+
+  .hints {
+    background: var(--panel); border: 1px dashed var(--line-strong); border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .hints ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .hints li { position: relative; padding-left: 24px; font-size: 14.5px; color: var(--ink-soft); }
+  .hints li::before {
+    content: "→"; position: absolute; left: 0; top: 0; color: var(--accent); font-weight: 700;
+  }
+
+  .crit { display: flex; flex-direction: column; gap: 9px; }
+  .crit label {
+    display: flex; gap: 11px; align-items: flex-start; cursor: pointer;
+    padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 14.5px; color: var(--ink); transition: background .15s, border-color .15s;
+  }
+  .crit label:hover { border-color: var(--line-strong); background: var(--panel); }
+  .crit input { display: none; }
+  .crit .box {
+    width: 19px; height: 19px; flex: 0 0 auto; margin-top: 1px; border-radius: 6px;
+    border: 1.7px solid var(--line-strong); display: grid; place-items: center; transition: .15s;
+  }
+  .crit .box svg { width: 12px; height: 12px; opacity: 0; color: #fff; }
+  .crit input:checked + .box { background: #16a34a; border-color: #16a34a; }
+  .crit input:checked + .box svg { opacity: 1; }
+  .crit input:checked ~ .txt { color: var(--ink-faint); text-decoration: line-through; }
+
+  .traps {
+    background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: var(--radius);
+    padding: 16px 20px;
+  }
+  .traps ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  .traps li { position: relative; padding-left: 26px; font-size: 14.5px; color: #7c4a08; }
+  .traps li::before {
+    content: "!"; position: absolute; left: 0; top: 0; width: 17px; height: 17px;
+    background: var(--warn); color: #fff; border-radius: 5px; font-family: var(--font-mono);
+    font-size: 11px; font-weight: 800; display: grid; place-items: center;
+  }
+
+  .mark-done {
+    margin-top: 40px; display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px; border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--panel);
+  }
+  .mark-done button {
+    font-family: var(--font-sans); font-size: 14px; font-weight: 650; cursor: pointer;
+    border: none; padding: 10px 18px; border-radius: 9px; background: var(--accent); color: #fff;
+    transition: filter .15s, transform .05s;
+  }
+  .mark-done button:hover { filter: brightness(1.05); }
+  .mark-done button:active { transform: translateY(1px); }
+  .mark-done.is-done button { background: #16a34a; }
+  .mark-done .hint { font-size: 13px; color: var(--ink-faint); }
+
+  .lesson-nav {
+    margin-top: 44px; padding-top: 24px; border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; gap: 14px;
+  }
+  .lesson-nav a {
+    flex: 1; text-decoration: none; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 11px; padding: 13px 16px; transition: border-color .15s, background .15s;
+    cursor: pointer;
+  }
+  .lesson-nav a:hover { border-color: var(--line-strong); background: var(--panel); }
+  .lesson-nav a.next { text-align: right; }
+  .lesson-nav .dir { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+  .lesson-nav .nm { font-weight: 650; font-size: 14px; margin-top: 3px; }
+  .lesson-nav a.disabled { opacity: 0; pointer-events: none; }
+
+  /* ---------- Home ---------- */
+  .hero-kicker {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .hero h2 {
+    font-size: 42px; line-height: 1.08; letter-spacing: -0.03em; font-weight: 830;
+    margin: 14px 0 0; text-wrap: balance;
+  }
+  .hero h2 .grad {
+    background: linear-gradient(100deg, #6366f1, #0ea5e9, #10b981, #f59e0b, #ec4899);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p { font-size: 17px; color: var(--ink-soft); margin: 18px 0 0; max-width: 60ch; }
+
+  .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 34px; }
+  .rule {
+    border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+  }
+  .rule .n { font-family: var(--font-mono); font-size: 11px; color: var(--accent); font-weight: 700; }
+  .rule .t { font-weight: 700; font-size: 14.5px; margin: 6px 0 4px; letter-spacing: -0.01em; }
+  .rule .d { font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
+
+  .phase-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 22px; }
+  .pcard {
+    border: 1px solid var(--line); border-radius: 14px; padding: 20px; cursor: pointer;
+    background: var(--ground); transition: transform .12s, box-shadow .2s, border-color .2s;
+    position: relative; overflow: hidden;
+  }
+  .pcard::before {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--pc);
+  }
+  .pcard:hover { transform: translateY(-2px); box-shadow: 0 12px 30px -14px rgba(30,40,70,.28); border-color: var(--pc); }
+  .pcard .pnum { font-family: var(--font-mono); font-size: 12px; color: var(--pc); font-weight: 700; }
+  .pcard h3 { margin: 8px 0 4px; font-size: 18px; letter-spacing: -0.02em; }
+  .pcard .sub { font-size: 13px; color: var(--ink-soft); }
+  .pcard .cnt { font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); margin-top: 12px; }
+
+  .section-title {
+    font-size: 13px; font-family: var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 46px 0 4px; font-weight: 700;
+  }
+  .proj {
+    margin-top: 20px; border: 1px solid var(--line); border-radius: 16px; padding: 24px;
+    background: linear-gradient(135deg, #fafbff, #f4f7ff);
+  }
+  .proj h3 { margin: 0 0 6px; font-size: 20px; letter-spacing: -0.02em; }
+  .proj p { color: var(--ink-soft); font-size: 14.5px; margin: 0 0 16px; }
+  .ms { display: flex; flex-direction: column; gap: 8px; }
+  .ms-row { display: flex; gap: 12px; align-items: baseline; font-size: 14px; }
+  .ms-row .mn { font-family: var(--font-mono); font-size: 11px; color: #fff; background: var(--ink); padding: 2px 8px; border-radius: 6px; flex: 0 0 auto; }
+  .ms-row .md { color: var(--ink-soft); }
+  .ms-row .md b { color: var(--ink); font-weight: 700; }
+
+  /* ---------- Mobile ---------- */
+  .backdrop { display: none; }
+  .hamburger { display: none; }
+  @media (max-width: 900px) {
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%);
+      transition: transform .25s ease; box-shadow: 0 0 60px rgba(0,0,0,.2);
+    }
+    .app.nav-open .sidebar { transform: none; }
+    .backdrop {
+      display: block; position: fixed; inset: 0; background: rgba(20,26,40,.4);
+      opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 25;
+    }
+    .app.nav-open .backdrop { opacity: 1; pointer-events: auto; }
+    .topbar {
+      display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 20;
+      background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line); padding: 12px 18px;
+    }
+    .hamburger {
+      display: grid; place-items: center; width: 38px; height: 38px; border-radius: 9px;
+      border: 1px solid var(--line-strong); background: var(--ground); cursor: pointer;
+    }
+    .topbar .tt { font-weight: 750; font-size: 15px; }
+    .content { padding: 28px 22px 100px; }
+    .rules { grid-template-columns: 1fr; }
+    .phase-grid { grid-template-columns: 1fr; }
+    .hero h2 { font-size: 32px; }
+  }
+</style>
+
+<div class="app" id="app">
+  <div class="backdrop" id="backdrop"></div>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="kicker">Frontend Mastery</div>
+      <h1 style="cursor:pointer" id="homeLink">Lý thuyết &amp; Thực hành</h1>
+      <div class="progress-wrap">
+        <div class="progress-row"><span>Tiến độ</span><b id="progText">0/22 bài</b></div>
+        <div class="bar"><i id="progBar"></i></div>
+      </div>
+    </div>
+    <div class="search"><input id="search" type="search" placeholder="Tìm bài học…" aria-label="Tìm bài học"></div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="Mở menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <span class="tt">Frontend Mastery</span>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script>
+const ICON = {
+  ctx:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>',
+  goal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg>',
+  task: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h11M8 12h11M8 18h11"/><path d="M3.5 6l1 1 1.5-2M3.5 12l1 1 1.5-2M3.5 18l1 1 1.5-2"/></svg>',
+  hint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3Z"/></svg>',
+  crit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  trap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
+};
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M4 12l5 5L20 6"/></svg>';
+const CHECK_SM = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2"><path d="M4 12l5 5L20 6"/></svg>';
+
+const PHASES = [
+  { num: "00", title: "JS & Browser Foundations", sub: "Event loop, memory, async — nền tảng chắc",
+    color: "#6366f1", soft: "#eef0fe",
+    lessons: [
+      { n: "00.01", title: "Event Loop thực sự",
+        ctx: "Sếp báo: “Trang đơ 2 giây mỗi khi bấm Export.” Nguyên nhân là một vòng lặp nặng chạy đồng bộ. Để hiểu vì sao nó đơ cả UI và cách sửa, bạn phải hiểu event loop — trái tim của mọi thứ chạy trong browser.",
+        goals: ["Hiểu call stack, task queue (macrotask), microtask queue", "Thứ tự thực thi: đồng bộ → microtask → macrotask", "requestAnimationFrame và requestIdleCallback xen vào đâu", "Vì sao code đồng bộ nặng làm đơ UI (block main thread)"],
+        tasks: ["Đoán output đoạn <code>console.log('1'); setTimeout(()=>log('2'),0); Promise.resolve().then(()=>log('3')); console.log('4')</code> trước, rồi chạy kiểm chứng. Giải thích vì sao là <code>1 4 3 2</code>.", "Thêm case khó: lồng <code>Promise.then</code> trong <code>setTimeout</code> và ngược lại. Đoán → chạy → giải thích.", "Trong browser: nút bấm chạy <code>for</code> 3 tỷ vòng. Quan sát UI freeze (không scroll/click được).", "Vẽ sơ đồ: call stack, microtask queue, macrotask queue và luồng một tick."],
+        hints: ["Sau MỖI macrotask, event loop rút cạn TOÀN BỘ microtask queue trước khi qua macrotask kế.", "<code>await x</code> ≈ <code>.then()</code> — phần sau await là một microtask.", "requestAnimationFrame chạy ngay trước lần paint kế (~mỗi 16ms ở 60fps)."],
+        crit: ["Đoán đúng output của 3 đoạn code trộn async khác nhau", "Giải thích được bằng lời tại sao microtask chạy trước macrotask", "Vẽ và thuyết trình sơ đồ event loop trong 2 phút"],
+        traps: ["Nghĩ <code>setTimeout(fn,0)</code> chạy ngay — không, nó vào macrotask, chờ hết microtask.", "Nghĩ Promise chạy song song — JS đơn luồng, Promise chỉ lập lịch callback.", "Quên main thread lo cả JS lẫn rendering → code nặng đồng bộ = UI freeze."] },
+      { n: "00.02", title: "Memory, Reference & Closure Leaks",
+        ctx: "App mở cả ngày càng lúc càng chậm, tab ngốn 2GB rồi crash. Gần như luôn là memory leak. Muốn tìm và sửa, phải hiểu JS quản lý bộ nhớ thế nào và closure giữ reference ra sao.",
+        goals: ["Phân biệt stack (primitive) vs heap (object/reference)", "Hiểu “pass by value” vs “pass by reference” thực chất", "Closure giữ reference tới scope ngoài → nguồn leak", "Dùng Chrome DevTools Memory panel (heap snapshot)"],
+        tasks: ["Chứng minh: gán object rồi sửa property ảnh hưởng cả hai biến; primitive thì không. Giải thích bằng mô hình stack/heap.", "Tạo leak cố ý: listener capture một mảng lớn <code>bigData</code>, gọi nhiều lần, chụp heap snapshot xem bộ nhớ tăng không giảm.", "Sửa leak: <code>removeEventListener</code> đúng cách, hoặc không capture <code>bigData</code>.", "Liệt kê 4 nguồn leak FE: listener không gỡ, timer không clear, detached DOM node, biến toàn cục vô tình."],
+        hints: ["Heap snapshot: chụp trước → hành động → chụp sau → so sánh objects allocated.", "“Detached DOM tree” trong snapshot là dấu hiệu kinh điển của leak.", "GC chỉ dọn object không còn ai reference. Closure = còn reference."],
+        crit: ["Giải thích reference vs value bằng sơ đồ stack/heap", "Tạo được leak, thấy trong Memory panel, rồi sửa và chứng minh đã hết", "Kể được 4 nguồn leak và cách phòng mỗi loại"],
+        traps: ["Quên <code>clearInterval/clearTimeout</code> khi component unmount.", "Trong React: đăng ký listener trong <code>useEffect</code> nhưng không return cleanup.", "Giữ reference tới DOM node đã bị remove → detached node leak."] },
+      { n: "00.03", title: "Async sâu",
+        ctx: "Bạn gọi 5 API để dựng dashboard. Có cái phụ thuộc nhau, có cái độc lập. Gọi sai cách → trang tải chậm gấp 3, và một API lỗi làm sập cả trang. Cần làm chủ async để orchestrate đúng.",
+        goals: ["Async/await chỉ là đường cú pháp trên Promise", "Chọn đúng: tuần tự vs song song", "Phân biệt Promise.all / allSettled / race / any", "Xử lý lỗi async đúng cách"],
+        tasks: ["Tạo hàm giả lập API (Promise trả sau 500–1500ms).", "Gọi 3 API độc lập theo 2 cách: <code>await</code> tuần tự vs <code>Promise.all</code>. Đo thời gian, giải thích chênh lệch.", "1 API fail: so sánh <code>Promise.all</code> (reject hết) vs <code>allSettled</code> (báo từng cái). Khi nào dùng cái nào?", "Viết <code>fetchWithTimeout(promise, ms)</code> dùng <code>Promise.race</code>.", "Bọc try/catch đúng chỗ để 1 API lỗi không crash cả app."],
+        hints: ["API độc lập → luôn song song. API phụ thuộc → tuần tự.", "<code>allSettled</code> không bao giờ reject — trả mảng {status, value|reason}.", "<code>race</code> theo cái xong trước; <code>any</code> chỉ quan tâm cái resolve đầu tiên."],
+        crit: ["Đo và giải thích chênh lệch tuần tự vs song song", "Chọn đúng combinator cho từng tình huống", "Có fetchWithTimeout chạy đúng"],
+        traps: ["<code>await</code> trong <code>for</code> với call độc lập = tự làm chậm.", "Quên Promise.all fail-fast: 1 reject mất hết.", "Nuốt lỗi (empty catch) → bug ẩn."] },
+      { n: "00.04", title: "Debounce & Throttle (tự viết)",
+        ctx: "Ô search gọi API mỗi ký tự → 20 request cho 1 từ khóa. Scroll chạy handler 100 lần/giây → giật. Hai vũ khí kinh điển: debounce và throttle. Tự viết để hiểu tận gốc.",
+        goals: ["Khác biệt bản chất giữa debounce và throttle", "Tự implement cả hai bằng closure + timer", "Biết chọn cái nào cho tình huống nào"],
+        tasks: ["Viết <code>debounce(fn, delay)</code> — chỉ chạy sau khi ngừng gọi delay ms.", "Viết <code>throttle(fn, interval)</code> — chạy tối đa 1 lần mỗi interval.", "Demo: input dùng debounce, scroll dùng throttle. Đếm số lần handler chạy vs số event.", "Nâng cao: thêm option leading/trailing cho debounce."],
+        hints: ["Debounce: mỗi lần gọi thì clearTimeout cái cũ rồi setTimeout cái mới.", "Throttle: giữ flag/timestamp, bỏ qua các lần gọi trong interval.", "Giữ đúng <code>this</code> và arguments: <code>fn.apply(this, args)</code>."],
+        crit: ["Debounce & throttle tự viết chạy đúng, không thư viện", "Demo cho thấy số lần handler chạy giảm rõ rệt", "Giải thích: search dùng debounce, scroll/resize dùng throttle"],
+        traps: ["Định nghĩa timer/flag ngoài closure → dùng chung mọi instance (sai).", "Debounce cho scroll → UI không phản hồi tới khi ngừng scroll.", "Quên cleanup timer khi unmount (leak)."] },
+    ]},
+  { num: "01", title: "How the Browser Works", sub: "Rendering path, reflow/repaint, layers, loading",
+    color: "#0ea5e9", soft: "#e6f6fe",
+    lessons: [
+      { n: "01.01", title: "Critical Rendering Path",
+        ctx: "Trang hiển thị chậm (màn trắng lâu). Sếp hỏi “sao lâu vậy?”. Để trả lời, phải hiểu chuỗi bước browser biến HTML/CSS/JS thành pixel: Critical Rendering Path.",
+        goals: ["5 bước: DOM → CSSOM → Render Tree → Layout → Paint → Composite", "Mỗi bước tốn gì và cái gì chặn nó", "Vì sao CSS render-blocking còn JS parser-blocking"],
+        tasks: ["Vẽ sơ đồ 5 bước CRP, ghi rõ input/output mỗi bước.", "Đặt <code>&lt;link&gt;</code> CSS nặng trong <code>&lt;head&gt;</code>, xem Network waterfall + Performance panel, quan sát First Paint.", "Chuyển <code>&lt;script&gt;</code> xuống cuối body hoặc thêm <code>defer</code>, đo lại thời điểm nội dung xuất hiện.", "Record load trong Performance panel, chỉ ra Parse HTML, Recalc Style, Layout, Paint, Composite."],
+        hints: ["Render Tree = DOM ∩ CSSOM (bỏ display:none, thêm pseudo-elements).", "CSS chặn render vì browser không muốn flash nội dung chưa style.", "Script không async/defer chặn parser đứng chờ tải + chạy JS."],
+        crit: ["Vẽ và thuyết trình 5 bước CRP", "Chỉ ra trên Performance panel từng bước khi nào", "Giải thích vì sao đặt script sai chỗ làm chậm First Paint"],
+        traps: ["Nhét CSS/JS không cần vào <code>&lt;head&gt;</code> → chặn paint.", "Nghĩ DOM = HTML. DOM là cây object, HTML chỉ là text nguồn.", "Bỏ qua Composite — với animation nó quyết định mượt hay giật."] },
+      { n: "01.02", title: "Reflow vs Repaint vs Composite",
+        ctx: "Một animation giật cục. Trang khác lag khi thêm 100 item. Cả hai do bạn vô tình bắt browser làm lại việc đắt tiền: reflow. Bài học “tiền” của mọi tối ưu runtime.",
+        goals: ["Phân biệt Reflow (Layout) vs Repaint vs Composite theo độ đắt", "Thao tác nào gây cái nào", "Batch DOM read/write tránh layout thrashing"],
+        tasks: ["Tạo layout thrashing storm: vòng lặp đọc <code>offsetHeight</code> rồi set style. Record, đếm số lần Layout.", "Fix: tách READ trước, WRITE sau (batch). Đo lại số lần Layout.", "Bật Paint flashing. Animate bằng <code>left/top</code> vs <code>transform</code>, xem vùng nào bị paint lại.", "Lập bảng 10 thao tác → gây Reflow / Repaint / chỉ Composite."],
+        hints: ["Đọc geometry (offsetHeight, getBoundingClientRect) sau khi vừa ghi style → buộc reflow đồng bộ.", "<code>transform</code> và <code>opacity</code> chỉ chạy ở Composite (GPU) → rẻ nhất.", "Đổi width/height/top/left/margin → reflow. Đổi color/background/box-shadow → repaint."],
+        crit: ["Chứng minh batch read/write giảm số lần Layout (có số liệu)", "Dùng Paint flashing thấy vùng repaint", "Có bảng phân loại thao tác → reflow/repaint/composite"],
+        traps: ["Vòng lặp xen kẽ read-write DOM = layout thrashing kinh điển.", "Animate bằng left/top thay vì transform → giật vì reflow mỗi frame.", "Lạm dụng <code>will-change</code> → ngốn bộ nhớ GPU."] },
+      { n: "01.03", title: "GPU Layers & Compositing",
+        ctx: "Bạn nghe “dùng transform cho nhanh”, “thêm will-change cho mượt” nhưng không rõ vì sao, và có lần thêm will-change xong còn chậm hơn. Bài này làm sáng tỏ compositing layer.",
+        goals: ["Compositor layer là gì, khi nào browser tách layer", "Vì sao transform/opacity animation mượt (chạy compositor thread)", "Dùng will-change đúng liều và tác hại khi lạm dụng"],
+        tasks: ["Bật Layer borders, quan sát element nào tách layer riêng.", "Thêm <code>transform: translateZ(0)</code> hoặc <code>will-change</code>, xem nó được promote thành layer.", "Mở tab Layers, xem cây layer và Compositing Reasons.", "Thí nghiệm phản tác dụng: thêm will-change cho 500 element, quan sát GPU memory tăng, app chậm hơn."],
+        hints: ["Animation transform/opacity có thể chạy compositor thread → không bị block dù main thread bận.", "Element promote layer khi: 3D transform, will-change, video/canvas, một số position:fixed.", "will-change là lời hứa “sắp animate” — dùng đúng chỗ, gỡ ra sau."],
+        crit: ["Thấy và giải thích cây layer trong tab Layers", "Chứng minh transform animation không bị block bởi main thread bận", "Giải thích vì sao lạm dụng will-change phản tác dụng"],
+        traps: ["Rắc will-change khắp nơi “cho chắc” → ngốn RAM, chậm hơn.", "Nhầm GPU accelerated = luôn nhanh. Tách layer cũng tốn chi phí quản lý.", "Quá nhiều layer nhỏ → layer explosion."] },
+      { n: "01.04", title: "Resource Loading Strategies",
+        ctx: "Trang tải font trễ nên chữ nhảy (FOUT), ảnh hero xuất hiện chậm, script analytics chặn cả trang. Cần kiểm soát thứ tự và độ ưu tiên tải resource.",
+        goals: ["async vs defer cho script", "preload / prefetch / preconnect / dns-prefetch dùng khi nào", "HTTP caching cơ bản (Cache-Control, ETag)"],
+        tasks: ["3 phiên bản script: mặc định, async, defer. Xác định mỗi cái chặn parse không, chạy khi nào.", "Thêm <code>&lt;link rel=preload&gt;</code> cho font/ảnh hero, xem cột Priority đổi.", "Thêm <code>preconnect</code> tới origin API bên thứ 3, đo cải thiện thời gian kết nối.", "Xem header <code>Cache-Control</code> và <code>ETag</code>, reload quan sát 304 / from cache."],
+        hints: ["defer: tải song song, chạy sau khi parse xong, giữ thứ tự. Tốt cho hầu hết script app.", "async: tải song song, chạy ngay khi xong, không đảm bảo thứ tự. Tốt cho analytics.", "preload = chắc chắn cần sớm; prefetch = có thể cần cho trang sau."],
+        crit: ["Giải thích async vs defer bằng quan sát thực tế", "Dùng preload/preconnect và đo cải thiện", "Đọc cache header, giải thích 304 vs from-cache"],
+        traps: ["Preload mọi thứ → cạnh tranh băng thông với resource thật cần.", "async cho script phụ thuộc nhau → chạy sai thứ tự, lỗi.", "Quên <code>font-display: swap</code> → màn trống chữ (FOIT)."] },
+    ]},
+  { num: "02", title: "Performance Optimization", sub: "Web Vitals, re-render, bundle, web workers",
+    color: "#10b981", soft: "#e6f8f1",
+    lessons: [
+      { n: "02.01", title: "Core Web Vitals",
+        ctx: "Google báo trang bạn “Poor” trên PageSpeed, ảnh hưởng SEO. Ba chỉ số: LCP (tải), INP (tương tác), CLS (ổn định layout). Phải hiểu từng cái đo gì và chữa thế nào.",
+        goals: ["LCP, INP (thay FID từ 2024), CLS đo gì và ngưỡng tốt", "Nguyên nhân phổ biến và cách chữa từng chỉ số", "Đo cả lab (Lighthouse) lẫn field (web-vitals)"],
+        tasks: ["Chạy Lighthouse trên một trang thật, ghi LCP/INP/CLS và các Opportunities.", "LCP: xác định LCP element, preload/tối ưu ảnh, đo lại.", "CLS: tạo layout shift cố ý (ảnh không set kích thước), sửa bằng width/height hoặc aspect-ratio.", "INP: handler click nặng gây phản hồi chậm, chia nhỏ tác vụ (yield), đo lại.", "Cài <code>web-vitals</code>, log 3 chỉ số — hiểu lab vs field data."],
+        hints: ["Ngưỡng Good: LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1.", "LCP hay bị hại bởi ảnh lớn, render-blocking CSS/JS, TTFB chậm.", "CLS: luôn đặt kích thước cho ảnh/ads/iframe.", "INP: bottleneck thường là long task > 50ms khi tương tác."],
+        crit: ["Cải thiện đo được ít nhất 1 chỉ số (số trước/sau)", "Giải thích nguyên nhân gốc mỗi chỉ số khi kém", "Phân biệt lab data vs field data"],
+        traps: ["Tối ưu điểm Lighthouse mà quên field data — cái Google xếp hạng.", "Sửa CLS chỗ này lại tạo shift chỗ khác.", "Nghĩ INP chỉ về JS — gồm cả input delay, processing, presentation delay."] },
+      { n: "02.02", title: "React Re-render & Virtualization",
+        ctx: "Dashboard render bảng 10.000 dòng → gõ 1 ô filter là cả trang khựng 1 giây. Do render quá nhiều DOM + re-render thừa. Bài trung tâm của Milestone 2.",
+        goals: ["Khi nào React re-render và vì sao lan rộng", "Dùng đúng React.memo, useMemo, useCallback — và khi nào KHÔNG cần", "Áp dụng virtualization cho list/table lớn"],
+        tasks: ["Render list 10.000 item, dùng Profiler record một lần gõ filter, xem cái gì re-render.", "Bọc <code>React.memo</code>, truyền callback ổn định bằng <code>useCallback</code>. Profiler lại, so sánh.", "Áp dụng virtualization: tự viết bản tối giản (index theo scrollTop + item height), rồi dùng <code>@tanstack/react-virtual</code>.", "Đo số DOM node và thời gian render trước/sau."],
+        hints: ["React re-render khi: state đổi, parent re-render, context đổi.", "useMemo/useCallback chỉ đáng dùng khi tính toán đắt hoặc cần reference ổn định cho memo child.", "Virtualization: chỉ render ~30 dòng thấy được thay vì 10.000."],
+        crit: ["Dùng Profiler chỉ ra re-render thừa và loại bỏ (ảnh trước/sau)", "Virtualization: DOM node giảm từ hàng nghìn xuống hàng chục", "Giải thích khi nào KHÔNG nên dùng useMemo/useCallback"],
+        traps: ["Bọc memo nhưng vẫn truyền object/function inline mới mỗi render → memo vô dụng.", "Nhét mọi thứ vào useMemo “cho chắc” → chậm hơn.", "Dùng index làm key trong list động → bug reconciliation."] },
+      { n: "02.03", title: "Bundle & Code Splitting",
+        ctx: "main.js nặng 3MB, user mobile chờ 8 giây mới thấy gì. Điều quan trọng nhất về performance: ship ít JS hơn. Bài này học phân tích và cắt bundle.",
+        goals: ["Phân tích bundle, biết cái gì chiếm dung lượng", "Route-based & component-based code splitting", "Tree shaking và vì sao đôi khi không hoạt động"],
+        tasks: ["Build, dùng <code>rollup-plugin-visualizer</code> xem treemap, tìm 3 thư viện nặng nhất.", "Áp dụng <code>React.lazy</code> + <code>Suspense</code> cho các route, xác nhận mỗi route thành chunk riêng.", "Tìm import “nặng cả thư viện chỉ để dùng 1 hàm”, sửa thành import cụ thể. Đo lại.", "Kiểm tra tree shaking: import 1 hàm, build, xác nhận phần không dùng bị loại."],
+        hints: ["Chunk ban đầu nhỏ = first load nhanh.", "Tree shaking cần ES modules, không tốt với CommonJS hoặc code có side effects.", "Xem <code>\"sideEffects\"</code> trong package.json của thư viện."],
+        crit: ["Có treemap bundle và chỉ ra thủ phạm nặng", "Route lazy loading chạy, chunk ban đầu giảm đo được", "Giải thích một trường hợp tree shaking không ăn"],
+        traps: ["<code>import _ from 'lodash'</code> kéo cả thư viện. Dùng lodash-es + import cụ thể.", "Lazy load quá mịn → nhiều request nhỏ, waterfall chậm.", "Quên Suspense fallback → màn trắng khi chunk đang tải."] },
+      { n: "02.04", title: "Web Workers (offload main thread)",
+        ctx: "Dashboard cần parse file CSV 50MB hoặc tính thống kê nặng. Làm trên main thread → UI freeze. Giải pháp: đẩy sang Web Worker chạy ở thread khác.",
+        goals: ["Web Worker chạy thread riêng, không chia sẻ DOM", "Giao tiếp qua postMessage / onmessage", "Khi nào đáng dùng worker (và chi phí serialize)"],
+        tasks: ["Tác vụ nặng chạy main thread, quan sát UI freeze + long task.", "Chuyển sang <code>worker.js</code>, giao tiếp qua postMessage/onmessage, xác nhận UI vẫn mượt.", "Đo overhead: dữ liệu lớn qua postMessage bị copy (structured clone). Thử Transferable (ArrayBuffer).", "Bọc worker trong API Promise-based: <code>runInWorker(data): Promise</code>."],
+        hints: ["Worker không truy cập window/document/DOM — chỉ tính toán thuần.", "Dữ liệu qua postMessage bị clone (tốn), trừ khi dùng Transferable.", "Vite: <code>new Worker(new URL('./worker.js', import.meta.url), {type:'module'})</code>."],
+        crit: ["Chứng minh tác vụ nặng không còn freeze UI sau khi chuyển worker", "So sánh long task main thread trước/sau", "Giải thích chi phí serialize và khi nào worker KHÔNG đáng"],
+        traps: ["Dùng worker cho tác vụ nhẹ → overhead lớn hơn lợi ích.", "Truyền object khổng lồ qua postMessage mỗi lần → nghẽn vì clone.", "Quên terminate worker → leak thread."] },
+    ]},
+  { num: "03", title: "Browser APIs chuyên sâu", sub: "IndexedDB, Service Worker, WebSocket",
+    color: "#f59e0b", soft: "#fef4e2",
+    lessons: [
+      { n: "03.01", title: "IndexedDB",
+        ctx: "Dashboard cần cache hàng nghìn dòng để xem offline. localStorage không đủ (~5MB, đồng bộ, chỉ string). Giải pháp đúng: IndexedDB — database async trong browser, lưu object/blob dung lượng lớn.",
+        goals: ["Chọn: localStorage vs sessionStorage vs IndexedDB vs Cache API", "Object store, key, index, transaction, versioning", "Dùng IndexedDB thô một lần, rồi qua wrapper idb"],
+        tasks: ["Bảng so sánh 4 kiểu lưu trữ: dung lượng, đồng bộ/bất đồng bộ, kiểu dữ liệu, use case.", "Dùng API thô: mở DB, tạo object store + index, CRUD record. Chịu đau với event-based API để hiểu bản chất.", "Viết lại bằng thư viện <code>idb</code> (Promise wrapper), so sánh độ dễ đọc.", "Versioning: bump version, thêm index mới trong <code>onupgradeneeded</code>, xử lý migration.", "Áp dụng: cache dữ liệu bảng dashboard vào IndexedDB."],
+        hints: ["localStorage đồng bộ → block main thread; chỉ hợp dữ liệu nhỏ (token, setting).", "IndexedDB bất đồng bộ, transaction-based; index cho query nhanh theo field.", "idb của Jake Archibald làm IndexedDB dễ thở hơn nhiều."],
+        crit: ["Bảng so sánh lưu trữ và giải thích chọn cái nào khi nào", "CRUD được với IndexedDB thô lẫn idb", "Xử lý versioning/migration không mất dữ liệu"],
+        traps: ["Lưu dữ liệu lớn vào localStorage → block main thread, tràn quota.", "Quên transaction tự đóng khi hết microtask → lỗi transaction is not active.", "Không xử lý onupgradeneeded cho user version cũ → crash."] },
+      { n: "03.02", title: "Service Worker & Offline (PWA)",
+        ctx: "User dashboard đi tàu điện, mất mạng liên tục. Yêu cầu: app vẫn mở được, xem được dữ liệu đã tải. Service Worker là proxy giữa app và network. ⚠️ Đây là API dễ gây tai nạn production nhất — cấu hình sai có thể khóa user ở bản cũ.",
+        goals: ["Lifecycle: install → activate → fetch; và vấn đề update", "Caching strategies: cache-first, network-first, stale-while-revalidate", "Biến app thành PWA installable, chạy offline"],
+        tasks: ["Đăng ký SW tối giản, quan sát lifecycle trong Application → Service Workers.", "Cache app shell trong <code>install</code>, phục vụ cache-first khi <code>fetch</code>. Tắt mạng, xác nhận app vẫn load.", "API data: áp dụng stale-while-revalidate, kết hợp IndexedDB từ 03.01.", "Update flow: sửa SW, quan sát waiting state, hiểu <code>skipWaiting</code> + <code>clients.claim</code> và rủi ro.", "Thêm <code>manifest.json</code> để installable. Làm lại caching bằng Workbox, so sánh."],
+        hints: ["Cache-first: nhanh nhưng dễ phục vụ đồ cũ → hợp asset có hash trong tên.", "Network-first: luôn mới nếu có mạng → hợp dữ liệu quan trọng.", "Stale-while-revalidate: cân bằng tốc độ + độ mới → hợp phần lớn API data."],
+        crit: ["App load được khi offline (app shell + dữ liệu cache)", "Áp dụng đúng 3 chiến lược cache cho 3 loại resource", "Giải thích update flow và cách tránh khóa user ở bản cũ"],
+        traps: ["Cache-first cho HTML gốc → user kẹt bản cũ mãi dù đã deploy.", "skipWaiting bừa bãi → SW mới tiếp quản giữa chừng, asset không khớp.", "Quên dọn cache cũ trong activate → phình storage.", "Test SW trên file:// (không chạy) — cần HTTPS hoặc localhost."] },
+      { n: "03.03", title: "WebSocket & Real-time",
+        ctx: "Dashboard cần cập nhật giá/thông báo tức thời. Polling mỗi giây lãng phí và trễ. WebSocket cho kết nối 2 chiều real-time. Phần khó nhất: reconnect bền bỉ khi mạng rớt.",
+        goals: ["Chọn đúng: WebSocket vs SSE vs polling", "Vòng đời connection và các event", "Tự viết lớp reconnect (exponential backoff) + heartbeat", "Cleanup đúng khi unmount / tab ẩn"],
+        tasks: ["Bảng so sánh WebSocket / SSE / long-polling. Khi nào nên SSE thay vì WebSocket?", "Kết nối echo server, gửi/nhận message, log lifecycle.", "Viết class <code>ReconnectingSocket</code>: tự reconnect khi close với backoff (1s,2s,4s… trần ~30s); heartbeat ping/pong phát hiện chết; hàng đợi message flush khi kết nối lại.", "Tích hợp React: hook <code>useSocket</code>, cleanup trong useEffect return.", "Tab ẩn: dùng Page Visibility API giảm hoạt động khi tab nền."],
+        hints: ["SSE (EventSource) đơn giản hơn cho luồng 1 chiều server→client, tự reconnect sẵn.", "Backoff phải có jitter (random nhỏ) tránh thundering herd.", "Heartbeat phát hiện half-open connection mà event close không bắn."],
+        crit: ["ReconnectingSocket tự hồi phục sau khi tắt/bật mạng, có backoff + jitter", "Heartbeat phát hiện kết nối chết", "Hook React cleanup sạch, không leak khi unmount"],
+        traps: ["Reconnect ngay không backoff → spam server, tự DDoS.", "Quên clear heartbeat timer khi reconnect → nhiều timer chồng nhau.", "Không cleanup socket khi unmount → connection ma + leak.", "Tin onclose luôn bắn khi mất mạng — không phải; cần heartbeat."] },
+    ]},
+  { num: "04", title: "MUI Theming & Design System", sub: "Theme, customization, dark mode, tokens",
+    color: "#ec4899", soft: "#fdeaf4",
+    lessons: [
+      { n: "04.01", title: "Theme Structure",
+        ctx: "Mỗi dev tự chế màu, spacing, font riêng → UI loạn, sửa 1 màu phải grep 200 chỗ. Giải pháp: một theme tập trung là nguồn chân lý duy nhất.",
+        goals: ["Các nhánh theme: palette, typography, spacing, breakpoints, shadows, transitions, zIndex, shape", "createTheme + ThemeProvider và cách truy cập theme", "Spacing scale và breakpoints thay vì hardcode px"],
+        tasks: ["Tạo <code>theme.ts</code>: palette, typography, spacing, breakpoints. Bọc app bằng ThemeProvider.", "Trang demo dùng CHỈ giá trị theme (<code>theme.spacing(2)</code>, <code>palette.primary.main</code>) — không hardcode.", "Đổi 1 giá trị (primary color), xác nhận toàn app đổi theo.", "Dùng <code>useTheme()</code> và <code>useMediaQuery(theme.breakpoints.down('md'))</code> làm responsive."],
+        hints: ["<code>theme.spacing(2)</code> = 16px mặc định (unit 8px).", "Palette có main/light/dark/contrastText — MUI tự tính nếu chỉ cho main.", "TypeScript: <code>declare module '@mui/material/styles'</code> để mở rộng type theme."],
+        crit: ["Theme tập trung, trang demo không có màu/spacing hardcode", "Đổi 1 token → cả app đổi theo", "Responsive dùng breakpoints của theme"],
+        traps: ["Hardcode màu/px trong component → mất khả năng đổi brand.", "createTheme trong body component → re-render toàn cây.", "Không mở rộng type theme khi thêm key custom."] },
+      { n: "04.02", title: "Component Customization đúng cách",
+        ctx: "Nút bấm có 15 kiểu vì mỗi người style bằng sx rải rác. Cần chuẩn hóa: định nghĩa style/variant tập trung, dùng lại nhất quán.",
+        goals: ["Phân biệt sx prop, styled(), theme.components", "Dùng cái nào khi nào và chi phí runtime", "Tạo custom variant qua theme"],
+        tasks: ["Style cùng một Button bằng 3 cách: sx, styled(), styleOverrides. Ghi khác biệt về tái sử dụng.", "Trong theme.components thêm <code>defaultProps</code> và <code>styleOverrides</code> áp mọi Button.", "Tạo custom variant (<code>variant=\"dashed\"</code>) qua <code>theme.components.MuiButton.variants</code>.", "Viết guideline: khi nào sx / styled / theme.components cho team."],
+        hints: ["sx: nhanh, cục bộ, nhưng rải rác → khó bảo trì nếu lặp.", "styled(): tạo component tái dùng có style gắn liền.", "theme.components: áp toàn cục + tạo variant → nguồn chân lý.", "Emotion có chi phí runtime; MUI đang dịch hướng zero-runtime."],
+        crit: ["Làm được cùng 1 style bằng cả 3 cách và giải thích trade-off", "Tạo custom variant qua theme và dùng lại", "Có guideline dùng cách nào khi nào"],
+        traps: ["Lạm dụng sx cho style lặp → nên nâng lên theme.components.", "Đè bằng CSS specificity thay vì qua theme → dễ vỡ khi MUI update.", "Định nghĩa styled() trong render → tạo lại component mỗi lần, mất state."] },
+      { n: "04.03", title: "Dark Mode với CSS Variables",
+        ctx: "Khách yêu cầu dark mode. Cách cũ (đổi theme object) làm re-render toàn cây và nhấp nháy. MUI hỗ trợ CSS variables mode để chuyển theme không re-render, không flash.",
+        goals: ["Bật CSS variables mode (cssVariables: true)", "Định nghĩa palette light + dark trong cùng theme", "Chuyển mode không nhấp nháy, tôn trọng prefers-color-scheme"],
+        tasks: ["Bật CSS variables, định nghĩa <code>colorSchemes: { light, dark }</code>.", "Nút toggle dùng <code>useColorScheme()</code>, quan sát không re-render toàn cây.", "Xử lý FOUC: áp mode sớm trước hydrate (InitColorSchemeScript).", "Tôn trọng prefers-color-scheme mặc định, lưu lựa chọn vào localStorage.", "Mở DevTools xem CSS variables <code>--mui-palette-…</code> đổi khi toggle."],
+        hints: ["CSS variables mode: đổi theme = đổi giá trị biến CSS, browser tự repaint.", "Lưu preference vào localStorage giữ lựa chọn qua các lần vào.", "FOUC xử lý bằng cách set mode trên <code>&lt;html&gt;</code> trước paint đầu."],
+        crit: ["Toggle dark mode mượt, không nhấp nháy, không re-render toàn cây", "Tôn trọng prefers-color-scheme + nhớ lựa chọn user", "Xem được CSS variables đổi trong DevTools"],
+        traps: ["Hardcode màu thay vì dùng palette token → dark mode không đổi chỗ đó.", "Không xử lý FOUC → chớp trắng/sai màu lúc load.", "Đổi cả theme object thay vì CSS vars mode → re-render nặng + flash."] },
+      { n: "04.04", title: "Design Tokens & Multi-brand",
+        ctx: "Công ty có 2 sản phẩm dùng chung codebase nhưng khác nhận diện. Cần hệ thống: đổi brand là đổi toàn bộ giao diện, không sửa component. Đó là design tokens.",
+        goals: ["Design token: tách giá trị thiết kế khỏi cách dùng", "Phân tầng: primitive → semantic → component", "Nhiều brand theme từ chung bộ token semantic"],
+        tasks: ["Định nghĩa primitive tokens (bảng màu gốc: blue-500, gray-900…) tách riêng.", "Định nghĩa semantic tokens map vào primitive (<code>color.action.primary = blue-500</code>). Component chỉ dùng semantic.", "Tạo <code>themeBrandA</code> và <code>themeBrandB</code>: chỉ đổi mapping semantic → primitive. Chuyển brand runtime.", "Kết hợp 04.03: mỗi brand có cả light + dark.", "Áp vào dashboard: chuyển được giữa 2 brand."],
+        hints: ["Primitive = màu gì tồn tại. Semantic = màu này dùng làm gì. Component chỉ biết semantic.", "Mô hình các design system lớn (Material, Primer, Lightning) dùng.", "Token nên export ra JSON để đồng bộ với Figma."],
+        crit: ["Tách 3 tầng token, component chỉ dùng semantic", "Đổi brand runtime, toàn app đổi giao diện, không sửa component", "Mỗi brand hỗ trợ cả light/dark"],
+        traps: ["Component dùng thẳng primitive → đổi brand phải sửa component (thất bại).", "Trộn semantic và primitive → mất nhất quán.", "Tạo quá nhiều token semantic không ai dùng → rối."] },
+    ]},
+  { num: "05", title: "Security & Maintainability", sub: "XSS/CSP, auth/CORS, testing, observability/CI",
+    color: "#ef4444", soft: "#fdeaea",
+    lessons: [
+      { n: "05.01", title: "XSS & Content Security Policy",
+        ctx: "Dashboard hiển thị comment/tên do user nhập. Kẻ xấu nhập <code>&lt;script&gt;đánh cắp cookie&lt;/script&gt;</code>. Nếu render thẳng, script chạy trên trình duyệt nạn nhân → XSS, lỗ hổng phổ biến nhất ở FE.",
+        goals: ["3 loại XSS: stored, reflected, DOM-based", "Phòng: output encoding, sanitize, tránh dangerouslySetInnerHTML", "Content Security Policy làm lớp phòng thủ chiều sâu"],
+        tasks: ["Tạo lỗ hổng XSS cố ý bằng <code>dangerouslySetInnerHTML</code>, nhập payload <code>&lt;img src=x onerror=alert(1)&gt;</code>, xác nhận chạy.", "Sửa: (a) để React tự escape, (b) nếu buộc render HTML thì sanitize bằng DOMPurify.", "Cấu hình CSP header chặn inline script, chỉ cho phép origin tin cậy. Quan sát CSP chặn payload.", "Liệt kê nơi dữ liệu không tin cậy chảy vào: URL params, localStorage, postMessage, API response."],
+        hints: ["React tự escape khi render <code>{userInput}</code> — đừng phá bằng dangerouslySetInnerHTML.", "CSP không thay thế sanitize; là lớp phòng thủ khi sanitize sót.", "<code>href=\"javascript:…\"</code> cũng là vector XSS — validate URL scheme."],
+        crit: ["Tái hiện XSS rồi vá bằng cả escape lẫn DOMPurify", "CSP chặn được inline script (thấy log vi phạm)", "Liệt kê các nguồn dữ liệu không tin cậy trong app"],
+        traps: ["Dùng dangerouslySetInnerHTML với dữ liệu user mà không sanitize.", "Tin dữ liệu từ URL/localStorage/API là an toàn.", "CSP quá lỏng (unsafe-inline) → coi như không có CSP."] },
+      { n: "05.02", title: "Auth an toàn, CORS & CSRF",
+        ctx: "Bạn lưu JWT vào localStorage vì tiện. Rồi một lỗ hổng XSS nhỏ để lộ toàn bộ token → mất tài khoản user. Lưu token ở đâu và bảo vệ request thế nào là quyết định bảo mật quan trọng.",
+        goals: ["Trade-off lưu token: localStorage vs httpOnly cookie", "CORS thực chất là gì (bảo vệ, không phải rào cản để tắt)", "CSRF và SameSite cookie"],
+        tasks: ["Bảng trade-off localStorage (dễ bị XSS lấy) vs httpOnly cookie (chống XSS đọc, cần chống CSRF). Kết luận cách nào an toàn hơn.", "Demo CORS: gọi API khác origin, quan sát preflight OPTIONS và header Access-Control-Allow-*.", "Mô phỏng CSRF: vì sao cookie tự gửi kèm request bị lợi dụng; SameSite=Lax/Strict chặn thế nào.", "Checklist auth an toàn: không log token, refresh flow, logout xóa sạch, không tin claim client-side."],
+        hints: ["httpOnly cookie: JS không đọc được → XSS khó lấy; nhưng cần chống CSRF.", "CORS do trình duyệt thực thi để bảo vệ user; “tắt CORS” ở FE là hiểu sai — phải cấu hình server.", "FE không bao giờ là nơi thực thi bảo mật cuối; server luôn verify lại."],
+        crit: ["Giải thích vì sao httpOnly cookie thường an toàn hơn localStorage cho token", "Đọc preflight CORS và giải thích lỗi CORS đúng bản chất", "Hiểu CSRF và vai trò của SameSite"],
+        traps: ["Lưu token nhạy cảm vào localStorage rồi có XSS → mất sạch.", "“Tắt CORS” bằng proxy bừa hoặc mode:no-cors — hiểu sai vấn đề.", "Tin role/permission phía client để ẩn UI mà không có server verify → bypass dễ."] },
+      { n: "05.03", title: "Testing (Unit / Component / E2E)",
+        ctx: "Mỗi lần sửa 1 chỗ lại vỡ 3 chỗ khác mà không ai biết cho tới khi user report. Test tự động là lưới an toàn để refactor tự tin. Bài này học test cái gì ở tầng nào.",
+        goals: ["Testing pyramid: nhiều unit, vừa component, ít e2e", "Viết unit (Vitest), component (Testing Library), e2e (Playwright)", "Test hành vi người dùng, không test chi tiết cài đặt"],
+        tasks: ["Unit (Vitest): test hàm thuần đã viết (debounce, backoff, format). Cover edge case.", "Component (RTL): render, tương tác (click/type), assert theo cái user thấy (<code>getByRole</code>, <code>getByText</code>).", "E2E (Playwright): 1 flow thật — mở app, filter bảng, thấy kết quả. Chạy headless.", "Cố tình gây regression, xác nhận test bắt được."],
+        hints: ["RTL triết lý: test như người dùng dùng, truy vấn theo role/label.", "Unit cho logic, component cho UI + tương tác, e2e cho luồng nghiệp vụ quan trọng.", "Đừng chạy theo 100% coverage — cover phần rủi ro cao, giá trị cao."],
+        crit: ["Có unit + component + e2e test chạy xanh", "Test bắt được regression khi cố tình phá", "Giải thích test nào thuộc tầng nào và vì sao"],
+        traps: ["Test chi tiết cài đặt (state, tên hàm nội bộ) → refactor là vỡ test.", "Quá nhiều e2e (chậm, flaky) thay vì đẩy xuống unit/component.", "Mock quá đà đến mức test không phản ánh thực tế."] },
+      { n: "05.04", title: "Observability & CI/CD",
+        ctx: "App lỗi trên máy user nhưng bạn không tái hiện được, không có log. Mỗi lần deploy là hồi hộp vì không có gì chặn code lỗi lên production. Bài này khép vòng: quan sát lỗi thật + cổng chất lượng tự động.",
+        goals: ["Bắt và báo cáo lỗi runtime (Error Boundary + error tracking)", "Đo Web Vitals của user thật (field data)", "CI gate: lint + typecheck + test + build"],
+        tasks: ["Thêm Error Boundary: component con throw thì hiện fallback thay vì màn trắng, log lỗi ra endpoint.", "Bắt lỗi async toàn cục: <code>window.onerror</code>, <code>onunhandledrejection</code>.", "Cài web-vitals, gửi LCP/INP/CLS thật của user về endpoint (RUM), đối chiếu với lab data.", "Dựng CI (GitHub Actions): lint → typecheck → test → build, chặn merge nếu fail."],
+        hints: ["Error Boundary chỉ bắt lỗi render của con — lỗi async/handler cần bắt riêng.", "Field data (RUM) mới là cái Google xếp hạng; lab data chỉ để debug.", "CI gate là hợp đồng chất lượng của team — không xanh không lên main."],
+        crit: ["Error Boundary + global handler bắt lỗi, có fallback UI, có log", "Web Vitals field data gửi về được và đọc được", "CI chặn PR khi lint/type/test/build fail"],
+        traps: ["Chỉ dựa Error Boundary → bỏ lọt lỗi async/promise rejection.", "Log lỗi kèm dữ liệu nhạy cảm (token, PII) → rò rỉ.", "CI chỉ chạy test mà bỏ typecheck/lint → lỗi vẫn lọt production."] },
+    ]},
+];
+
+const MILESTONES = [
+  ["M1", "<b>Skeleton</b> — React + TS + Vite + MUI, layout sidebar/header/content, mock data"],
+  ["M2", "<b>Performance</b> — bảng 10.000 dòng virtualized, code splitting, Lighthouse xanh"],
+  ["M3", "<b>Offline-first</b> — IndexedDB + Service Worker, tắt mạng vẫn xem được (PWA)"],
+  ["M4", "<b>Real-time</b> — WebSocket + reconnect (backoff + heartbeat), cleanup sạch"],
+  ["M5", "<b>Theming</b> — dark mode mượt (CSS vars) + brand theme thứ 2 đổi runtime"],
+  ["M6", "<b>Hardening</b> — security (CSP, sanitize, auth), test 3 tầng, CI gate"],
+];
+
+const RULES = [
+  ["01", "Học theo bài toán", "Không học API rời rạc. Mỗi bài bám một use case thực — kiến thức bám vấn đề mới ở lại lâu."],
+  ["02", "Đo được thì phải đo", "Mọi tối ưu có số trước/sau bằng DevTools. Senior không nói “chắc nhanh hơn”, họ chỉ vào con số."],
+  ["03", "Viết lại bằng lời mình", "Không giải thích được cho người khác = chưa hiểu. Mỗi bài xong, tự tóm tắt “hiểu ra gì”."],
+];
+
+/* ---------- State & persistence ---------- */
+const KEY_DONE = "fm-done-v1";
+const KEY_CRIT = "fm-crit-v1";
+function load(k){ try { return JSON.parse(localStorage.getItem(k)) || {}; } catch(e){ return {}; } }
+function save(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+let doneMap = load(KEY_DONE);
+let critMap = load(KEY_CRIT);
+
+const flatLessons = [];
+PHASES.forEach((p, pi) => p.lessons.forEach((l, li) => {
+  l.id = "p" + pi + "-" + li; l.pi = pi; l.li = li; l.color = p.color; l.soft = p.soft; l.phaseTitle = p.title; l.phaseNum = p.num;
+  flatLessons.push(l);
+}));
+const TOTAL = flatLessons.length;
+
+/* ---------- Sidebar render ---------- */
+const nav = document.getElementById("nav");
+function buildNav(){
+  nav.innerHTML = "";
+  PHASES.forEach((p, pi) => {
+    const item = document.createElement("div");
+    item.className = "nav-item"; item.dataset.pi = pi;
+    item.style.setProperty("--pc", p.color);
+    item.style.setProperty("--pc-soft", p.soft);
+    const btn = document.createElement("button");
+    btn.className = "phase-btn";
+    btn.innerHTML = `<span class="dot"></span><span class="pt">${p.title}</span><span class="pn">${p.num}</span>
+      <span class="chev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6"/></svg></span>`;
+    btn.onclick = () => item.classList.toggle("open");
+    const ll = document.createElement("div");
+    ll.className = "lessons";
+    p.lessons.forEach((l, li) => {
+      const lb = document.createElement("button");
+      lb.className = "lesson-btn" + (doneMap[l.id] ? " done" : "");
+      lb.dataset.id = l.id;
+      lb.dataset.search = (l.title + " " + l.n).toLowerCase();
+      lb.innerHTML = `<span class="ln">${l.n}</span><span class="lt">${l.title}</span>
+        <span class="check">${CHECK_SM}</span>`;
+      lb.onclick = () => { openLesson(l.id); if (window.innerWidth <= 900) closeNav(); };
+      ll.appendChild(lb);
+    });
+    item.appendChild(btn); item.appendChild(ll);
+    nav.appendChild(item);
+  });
+}
+
+function updateProgress(){
+  const n = Object.values(doneMap).filter(Boolean).length;
+  document.getElementById("progText").textContent = n + "/" + TOTAL + " bài";
+  document.getElementById("progBar").style.width = (n / TOTAL * 100) + "%";
+}
+
+/* ---------- Content render ---------- */
+const content = document.getElementById("content");
+let currentId = null;
+
+function setAccent(color, soft){
+  document.documentElement.style.setProperty("--accent", color);
+  document.documentElement.style.setProperty("--accent-soft", soft);
+}
+
+function esc(s){ return s; } // content is trusted, authored inline
+
+function block(icon, color, label, inner){
+  return `<section class="block"><div class="block-head">
+      <span class="block-ico" style="background:${color}">${icon}</span>
+      <h3>${label}</h3></div>${inner}</section>`;
+}
+
+function openLesson(id){
+  const idx = flatLessons.findIndex(l => l.id === id);
+  const l = flatLessons[idx];
+  if (!l) return;
+  currentId = id;
+  setAccent(l.color, l.soft);
+
+  document.querySelectorAll(".lesson-btn").forEach(b => b.classList.toggle("active", b.dataset.id === id));
+  const item = nav.querySelector('.nav-item[data-pi="' + l.pi + '"]');
+  if (item) item.classList.add("open");
+
+  const critState = critMap[id] || {};
+  const crit = l.crit.map((c, i) =>
+    `<label><input type="checkbox" data-i="${i}" ${critState[i] ? "checked" : ""}>
+       <span class="box">${CHECK}</span><span class="txt">${c}</span></label>`).join("");
+
+  const prev = flatLessons[idx - 1], next = flatLessons[idx + 1];
+  const navHtml = `<div class="lesson-nav">
+      <a class="prev ${prev ? "" : "disabled"}" ${prev ? `data-go="${prev.id}"` : ""}>
+        <div class="dir">← Bài trước</div><div class="nm">${prev ? prev.n + " " + prev.title : ""}</div></a>
+      <a class="next ${next ? "" : "disabled"}" ${next ? `data-go="${next.id}"` : ""}>
+        <div class="dir">Bài sau →</div><div class="nm">${next ? next.n + " " + next.title : ""}</div></a>
+    </div>`;
+
+  const isDone = !!doneMap[id];
+  content.className = "content fade";
+  content.innerHTML = `
+    <div class="lh-kicker"><span class="dot"></span>Phase ${l.phaseNum} · ${l.phaseTitle} · Bài ${l.n}</div>
+    <h2 class="lh-title">${l.title}</h2>
+    ${block(ICON.ctx, l.color, "Bối cảnh", `<div class="context">${l.ctx}</div>`)}
+    ${block(ICON.goal, l.color, "Mục tiêu", `<ul class="clean">${l.goals.map(g=>`<li>${g}</li>`).join("")}</ul>`)}
+    ${block(ICON.task, l.color, "Nhiệm vụ", `<ol class="tasks">${l.tasks.map(t=>`<li>${t}</li>`).join("")}</ol>`)}
+    ${block(ICON.hint, l.color, "Gợi ý", `<div class="hints"><ul>${l.hints.map(h=>`<li>${h}</li>`).join("")}</ul></div>`)}
+    ${block(ICON.crit, l.color, "Tiêu chí hoàn thành", `<div class="crit">${crit}</div>`)}
+    ${block(ICON.trap, "var(--warn)", "Bẫy thường gặp", `<div class="traps"><ul>${l.traps.map(t=>`<li>${t}</li>`).join("")}</ul></div>`)}
+    <div class="mark-done ${isDone ? "is-done" : ""}">
+      <button id="doneBtn">${isDone ? "✓ Đã hoàn thành" : "Đánh dấu đã hoàn thành"}</button>
+      <span class="hint">Tiến độ lưu tại trình duyệt của bạn.</span>
+    </div>
+    ${navHtml}`;
+
+  content.querySelectorAll(".crit input").forEach(inp => {
+    inp.onchange = () => {
+      const cs = critMap[id] || {}; cs[inp.dataset.i] = inp.checked; critMap[id] = cs; save(KEY_CRIT, critMap);
+    };
+  });
+  document.getElementById("doneBtn").onclick = () => {
+    doneMap[id] = !doneMap[id]; save(KEY_DONE, doneMap);
+    const lb = nav.querySelector('.lesson-btn[data-id="' + id + '"]');
+    if (lb) lb.classList.toggle("done", !!doneMap[id]);
+    updateProgress(); openLesson(id);
+  };
+  content.querySelectorAll("[data-go]").forEach(a => a.onclick = () => openLesson(a.dataset.go));
+  window.scrollTo(0, 0);
+  document.querySelector(".main").scrollTop = 0;
+}
+
+/* ---------- Home ---------- */
+function openHome(){
+  currentId = null;
+  setAccent("#6366f1", "#eef0fe");
+  document.querySelectorAll(".lesson-btn").forEach(b => b.classList.remove("active"));
+  content.className = "content fade";
+  content.innerHTML = `
+    <div class="hero">
+      <div class="hero-kicker">Lộ trình từ Mid · 4 năm → Senior · tư duy 10 năm</div>
+      <h2>Hiểu <span class="grad">browser</span> trước,<br>framework sau.</h2>
+      <p>22 bài thực hành qua 6 phase. Mỗi bài là một tình huống thật: bối cảnh → mục tiêu → nhiệm vụ từng bước → gợi ý → tiêu chí → bẫy thường gặp. Chọn một bài ở thanh bên để bắt đầu.</p>
+    </div>
+    <div class="rules">
+      ${RULES.map(r=>`<div class="rule"><div class="n">${r[0]}</div><div class="t">${r[1]}</div><div class="d">${r[2]}</div></div>`).join("")}
+    </div>
+    <div class="section-title">6 Phase</div>
+    <div class="phase-grid">
+      ${PHASES.map((p,pi)=>`<div class="pcard" style="--pc:${p.color}" data-pi="${pi}">
+        <div class="pnum">PHASE ${p.num}</div>
+        <h3>${p.title}</h3>
+        <div class="sub">${p.sub}</div>
+        <div class="cnt">${p.lessons.length} bài →</div>
+      </div>`).join("")}
+    </div>
+    <div class="section-title">Dự án xương sống</div>
+    <div class="proj">
+      <h3>Real-time Offline-first Dashboard</h3>
+      <p>Một dự án đi xuyên suốt 6 phase. Mỗi milestone áp dụng đúng kiến thức phase tương ứng — cuối lộ trình bạn có một sản phẩm portfolio chứng minh được tất cả.</p>
+      <div class="ms">${MILESTONES.map(m=>`<div class="ms-row"><span class="mn">${m[0]}</span><span class="md">${m[1]}</span></div>`).join("")}</div>
+    </div>`;
+  content.querySelectorAll(".pcard").forEach(c => c.onclick = () => {
+    const pi = c.dataset.pi;
+    const item = nav.querySelector('.nav-item[data-pi="' + pi + '"]');
+    if (item){ item.classList.add("open"); openLesson("p" + pi + "-0"); }
+    if (window.innerWidth <= 900) closeNav();
+  });
+  window.scrollTo(0, 0);
+}
+
+/* ---------- Search ---------- */
+document.getElementById("search").addEventListener("input", e => {
+  const q = e.target.value.trim().toLowerCase();
+  nav.querySelectorAll(".nav-item").forEach(item => {
+    let anyVisible = false;
+    item.querySelectorAll(".lesson-btn").forEach(lb => {
+      const match = !q || lb.dataset.search.includes(q);
+      lb.style.display = match ? "" : "none";
+      if (match) anyVisible = true;
+    });
+    item.style.display = anyVisible ? "" : "none";
+    if (q && anyVisible) item.classList.add("open");
+  });
+});
+
+/* ---------- Mobile nav ---------- */
+const app = document.getElementById("app");
+function openNav(){ app.classList.add("nav-open"); }
+function closeNav(){ app.classList.remove("nav-open"); }
+document.getElementById("hamburger").onclick = openNav;
+document.getElementById("backdrop").onclick = closeNav;
+document.getElementById("homeLink").onclick = () => { openHome(); if (window.innerWidth <= 900) closeNav(); };
+
+/* ---------- Init ---------- */
+buildNav();
+updateProgress();
+openHome();
+
+/* ---------- PWA: đăng ký Service Worker (no-op nơi không hỗ trợ / bị chặn) ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  });
+}
+</script>
