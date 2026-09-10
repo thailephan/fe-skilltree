@@ -101,6 +101,9 @@
   .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
   .nav { overflow-y: auto; padding: 10px 10px 40px; flex: 1; }
+  .nav-level { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; padding: 15px 12px 5px; margin-top: 6px; border-top: 1px solid var(--line); }
+  .nav-level:first-child { border-top: none; margin-top: 0; }
+  .donebox { background: #edfcf3; border: 1px solid #b7eccb; border-left: 3px solid #16a34a; border-radius: 0 var(--radius) var(--radius) 0; padding: 14px 18px; font-size: 15px; color: #14683a; }
   .nav-item { margin-bottom: 2px; }
   .phase-btn {
     width: 100%; display: flex; align-items: center; gap: 10px;
@@ -585,6 +588,294 @@ const PHASES = [
         crit: ["Error Boundary + global handler bắt lỗi, có fallback UI, có log", "Web Vitals field data gửi về được và đọc được", "CI chặn PR khi lint/type/test/build fail"],
         traps: ["Chỉ dựa Error Boundary → bỏ lọt lỗi async/promise rejection.", "Log lỗi kèm dữ liệu nhạy cảm (token, PII) → rò rỉ.", "CI chỉ chạy test mà bỏ typecheck/lint → lỗi vẫn lọt production."] },
     ]},
+  { num: "06", title: "Web Platform, Media & SEO", sub: "Intl, geolocation, media, SEO, observers, iframe",
+    color: "#8b5cf6", soft: "rgba(139,92,246,.10)",
+    lessons: [
+      { n: "06.01", title: "Intl & Internationalization",
+        ctx: "App bán ra 5 nước. Ngày 09/10/2026 là 9 tháng 10 hay 10 tháng 9? Giá 1.000 là một nghìn hay một phẩy không? Format bằng tay là sai.",
+        need: ["<code>Intl.DateTimeFormat</code> / <code>NumberFormat</code> / <code>RelativeTimeFormat</code> / <code>Collator</code> (sort theo locale)", "Timezone IANA, lưu UTC — hiển thị local; giới thiệu <code>Temporal</code> API (thay Date cũ)", "<code>navigator.language</code>, thuộc tính <code>lang</code>/<code>dir</code> (RTL), pluralization"],
+        done: "Format ngày/giờ/số/tiền theo locale bất kỳ không dùng thư viện, và giải thích vì sao luôn lưu UTC." },
+      { n: "06.02", title: "Geolocation & Context APIs",
+        ctx: "Tính năng 'cửa hàng gần bạn' cần vị trí. Xin sai cách → user từ chối vĩnh viễn, hoặc vi phạm luật riêng tư.",
+        need: ["Geolocation + <code>Permissions API</code>, xin quyền đúng ngữ cảnh (sau hành động của user)", "Fallback IP-geolocation (xu hướng 2026 vì luật riêng tư) khi bị từ chối", "Page Visibility API, Network Information API để thích ứng theo mạng/tab"],
+        done: "Xin quyền đúng thời điểm, xử lý gọn granted/denied/prompt, có fallback khi bị từ chối." },
+      { n: "06.03", title: "Media hiện đại (ảnh & video)",
+        ctx: "Ảnh hero 2MB làm LCP 5 giây trên mobile. Đây là nguyên nhân performance phổ biến nhất thực tế.",
+        need: ["<code>&lt;picture&gt;</code> + srcset + sizes, AVIF/WebP (mặc định 2026), luôn set width/height (chống CLS)", "<code>loading='lazy'</code> — KHÔNG đặt lên ảnh LCP; <code>decoding='async'</code>; <code>fetchpriority='high'</code> cho ảnh LCP", "<code>&lt;video&gt;</code> preload/poster/lazy, adaptive streaming (HLS/DASH khái niệm)"],
+        done: "Giảm LCP đo bằng số nhờ tối ưu ảnh, và giải thích vì sao lazy-load ảnh LCP là phản tác dụng." },
+      { n: "06.04", title: "SEO & Document Head",
+        ctx: "Trang không lên Google, share Facebook ra thẻ trống. Với SPA điều này càng dễ sai.",
+        need: ["Semantic HTML + heading hierarchy — nền của cả SEO lẫn a11y", "Meta (title/description/canonical) + Open Graph + Twitter Card, quản lý &lt;head&gt; động", "JSON-LD structured data (Schema.org) — AI/search trích thẳng; vì sao CSR thuần hại SEO"],
+        done: "Một trang có đủ meta + OG + JSON-LD, test bằng Rich Results Test và share preview." },
+      { n: "06.05", title: "Observers & Delivery nâng cao",
+        ctx: "Bạn viết tay scroll listener để lazy load / infinite scroll → giật và tốn. Có API native làm tốt hơn.",
+        need: ["<code>IntersectionObserver</code> (lazy load, infinite scroll, active section)", "<code>ResizeObserver</code>, <code>MutationObserver</code> — phản ứng theo kích thước/thay đổi DOM", "<code>fetchpriority</code>, Speculation Rules (prerender/prefetch), View Transitions API"],
+        done: "Thay một scroll-listener thủ công bằng IntersectionObserver; dùng Speculation Rules cho một điều hướng." },
+      { n: "06.06", title: "Iframe, Embedding & Cross-origin",
+        ctx: "Nhúng widget bên thứ 3 (map, thanh toán, chat), hoặc app bị nhúng, hoặc inject iframe/widget. Giao tiếp qua ranh giới origin phải an toàn.",
+        need: ["iframe <code>src</code>/<code>srcdoc</code>/<code>loading</code>/<code>allow</code>; resize theo nội dung", "<code>postMessage</code> + kiểm tra <code>event.origin</code> & <code>targetOrigin</code> (không dùng * cho dữ liệu nhạy cảm)", "<code>sandbox</code> cô lập nội dung không tin cậy; chống clickjacking bằng X-Frame-Options / CSP frame-ancestors"],
+        done: "Nhúng iframe cross-origin giao tiếp 2 chiều có kiểm tra origin, và chặn được trang mình khỏi bị nhúng trái phép." },
+    ]},
+  { num: "07", title: "State & Data Architecture", sub: "Client/server state, TanStack Query, Proxy, axios",
+    color: "#06b6d4", soft: "rgba(6,182,212,.10)",
+    lessons: [
+      { n: "07.01", title: "Client State vs Server State",
+        ctx: "Bạn fetch data vào useState, rồi tự quản loading/error/refetch/cache... code phình ra, dữ liệu giữa các component lệch nhau.",
+        need: ["Server state = dữ liệu mượn cache từ server, cần refetch/invalidation/đồng bộ", "Client state = UI state thuần (modal, tab, form nháp) bạn sở hữu 100%", "Vì sao dùng useState/Redux cho server state là sai gốc rễ (không TTL, không dedupe)"],
+        done: "Nhìn một biến state là phân loại được client hay server và biết công cụ nào hợp." },
+      { n: "07.02", title: "Data Fetching với TanStack Query",
+        ctx: "Cần cache, tự refetch khi focus lại tab, dedupe request trùng, optimistic update khi user bấm like.",
+        need: ["Query key, staleTime vs gcTime, background refetch, dedupe, retry", "Invalidation sau mutation (nguồn của 'dữ liệu không tự cập nhật')", "Optimistic update + rollback khi lỗi; pagination & infinite query"],
+        done: "Một mutation cập nhật UI lạc quan rồi rollback đúng khi API lỗi, và cache invalidate đúng chỗ." },
+      { n: "07.03", title: "Client State: Context / Zustand / Redux / XState",
+        ctx: "Chọn công cụ client state nào? Chọn sai → re-render toàn cây hoặc boilerplate ngập đầu.",
+        need: ["useState/useReducer → Context → Zustand → Redux Toolkit theo quy mô", "Vì sao Context không phải state manager (re-render mọi consumer)", "XState / state machine cho flow phức tạp (wizard, upload, auth) thay 'boolean soup'"],
+        done: "Biện hộ được lựa chọn state tool cho một feature, và refactor một 'boolean soup' thành state machine." },
+      { n: "07.04", title: "Forms & Validation at Scale",
+        ctx: "Form 30 field, validate phức tạp, mỗi keystroke re-render cả form → lag.",
+        need: ["Controlled vs uncontrolled; react-hook-form (uncontrolled) nhanh hơn cho form lớn", "Schema validation với zod dùng chung cho cả form lẫn API boundary", "Async validation, field array, error UX"],
+        done: "Form lớn không re-render thừa mỗi keystroke, và schema zod tái dùng cho cả client lẫn type." },
+      { n: "07.05", title: "Reactivity & JS Proxy (dưới lớp vỏ)",
+        ctx: "Vì sao sửa state.count++ trong Zustand/Valtio/Vue là UI tự cập nhật, còn React phải setState? Bí mật là JS Proxy.",
+        need: ["<code>Proxy</code> + <code>Reflect</code>: trap get/set/has — can thiệp mọi thao tác lên object", "Reactivity: track dependency lúc get, trigger update lúc set (Vue/Valtio/MobX)", "immer dùng Proxy biến 'mutate' thành immutable (nền Redux Toolkit); giới hạn Proxy"],
+        done: "Tự viết một object reactive tối giản bằng Proxy, và giải thích immer copy-on-write." },
+      { n: "07.06", title: "API Client Layer (axios best practices)",
+        ctx: "Mỗi component tự axios.get, token gắn tay, lỗi mỗi nơi một kiểu, request cũ không huỷ khi chuyển trang.",
+        need: ["<code>axios.create</code> + interceptors: gắn token, base URL, header chung", "Refresh-token flow: interceptor bắt 401 → refresh → retry, hàng đợi khi đang refresh", "Huỷ request bằng <code>AbortController</code>; retry+backoff; normalize error; gửi FormData/multipart"],
+        done: "Có apiClient tập trung: tự gắn token, tự refresh khi 401, huỷ được request, mọi lỗi về một dạng chuẩn." },
+    ]},
+  { num: "08", title: "TypeScript nâng cao", sub: "Generics, discriminated unions, type-safe boundaries",
+    color: "#14b8a6", soft: "rgba(20,184,166,.10)",
+    lessons: [
+      { n: "08.01", title: "Generics & Inference",
+        ctx: "Bạn viết hàm getById trả any, mất hết gợi ý và an toàn. Generic giữ được quan hệ type giữa input và output.",
+        need: ["Generic function/type, ràng buộc <code>extends</code>, default type param", "Type inference: để TS tự suy; <code>as const</code> và literal types", "Hàm util generic tái dùng (pick, groupBy) giữ nguyên type"],
+        done: "Viết được hàm generic mà IDE tự suy đúng type trả về theo input, không cần ép kiểu." },
+      { n: "08.02", title: "Union & Discriminated Unions",
+        ctx: "State có 4 dạng nhưng bạn dùng nhiều boolean rời → tổ hợp bất khả thi vẫn lọt (loading + error cùng true).",
+        need: ["Discriminated union làm trạng thái sai KHÔNG biểu diễn được", "Type narrowing (typeof, in, type guard)", "<code>never</code> cho exhaustiveness check (thêm case là compiler báo)"],
+        done: "Mô hình state bằng discriminated union và có exhaustive switch mà compiler ép xử lý đủ case." },
+      { n: "08.03", title: "Mapped, Conditional & Template Literal Types",
+        ctx: "Bạn muốn type 'giống type kia nhưng tất cả optional', hoặc suy type từ giá trị runtime. Đây là type-level programming.",
+        need: ["Utility types (Partial/Pick/Omit/Record/ReturnType) và tự viết lại chúng", "Mapped types, conditional types (<code>T extends U ? X : Y</code>), <code>infer</code>", "Template literal types (route/event type-safe); biết khi nào dừng (đừng over-engineer)"],
+        done: "Tự viết được Partial/Pick từ đầu và một conditional type giải quyết một nhu cầu thật." },
+      { n: "08.04", title: "Type-safe Boundaries",
+        ctx: "API trả JSON bạn khai là User, nhưng runtime nó thiếu field → crash. TS không kiểm runtime; ranh giới I/O là nơi type 'nói dối'.",
+        need: ["zod / valibot: validate runtime + suy type từ schema (một nguồn chân lý)", "Type hoá fetch/API layer, parse response tại biên, không tin dữ liệu ngoài", "End-to-end type safety (tRPC), tránh any ở ranh giới"],
+        done: "Mọi dữ liệu vào app (API, localStorage, URL) được validate tại biên và có type suy ra từ schema." },
+    ]},
+  { num: "09", title: "Rendering Architectures", sub: "CSR/SSR/SSG/ISR, RSC, streaming, Astro",
+    color: "#f97316", soft: "rgba(249,115,22,.10)",
+    lessons: [
+      { n: "09.01", title: "CSR / SSR / SSG / ISR — Trade-offs",
+        ctx: "Blog cần SEO + tải nhanh; dashboard sau đăng nhập thì không cần SEO. Một chiến lược không hợp mọi trang.",
+        need: ["CSR: nhanh khi điều hướng nội bộ, hại SEO — hợp app sau auth", "SSR tốt SEO/LCP tốn server; SSG nhanh nhất cho nội dung ít đổi", "ISR: SSG + revalidate — cân bằng cho nội dung đổi vừa phải"],
+        done: "Cho một loại trang cụ thể, chọn được chiến lược và giải thích trade-off SEO/tốc độ/chi phí." },
+      { n: "09.02", title: "Hydration, Streaming & Islands",
+        ctx: "SSR trả HTML đẹp nhưng trang 'chết' vài giây (bấm không ăn) — đó là chờ hydration.",
+        need: ["Hydration là gì, vì sao tốn; TTI vs FCP lệch nhau", "Streaming SSR (Suspense boundaries), progressive hydration", "Islands architecture (Astro): chỉ hydrate phần tương tác"],
+        done: "Giải thích được 'vì sao trang SSR hiện ra nhưng chưa bấm được' và streaming/islands giảm điều đó thế nào." },
+      { n: "09.03", title: "React Server Components & App Router",
+        ctx: "RSC (Next.js App Router) đổi hẳn mô hình: component chạy trên server, không gửi JS xuống client. Hướng đi chính của React 2026.",
+        need: ["Server Component vs Client Component (<code>'use client'</code>), ranh giới serialize", "Fetch data ngay trong server component, giảm JS bundle client", "Khi nào cần client component (state, event, browser API); server actions"],
+        done: "Phân loại được một component nên server hay client và giải thích lợi ích bundle/SEO của RSC." },
+      { n: "09.04", title: "Edge, Caching & tác động lên Vitals",
+        ctx: "Cùng một app, đặt render/cache ở đâu quyết định TTFB và LCP của user ở xa server.",
+        need: ["Edge rendering/functions (gần user), CDN caching, cache layers", "Cache-Control / stale-while-revalidate ở tầng HTTP áp cho cả trang", "Mỗi chiến lược render map ra LCP/INP/CLS thế nào"],
+        done: "Vẽ được đường đi của một request qua các lớp cache và chỉ ra chỗ tối ưu TTFB/LCP." },
+      { n: "09.05", title: "Astro & Multi-framework Interop",
+        ctx: "Trang marketing tĩnh nhưng vài widget cần React (team A) và phần khác cần Vue (team B). Astro cho nhúng nhiều framework, mỗi cái là một island.",
+        need: ["Islands: mặc định 0 JS, chỉ hydrate phần tương tác", "Client directives: <code>client:load/idle/visible/only</code> — kiểm soát khi nào hydrate", "Nhúng React+Vue+Svelte cùng lúc + cái giá; chia sẻ state giữa island (nano stores/events/URL)"],
+        done: "Dựng trang Astro ≥2 island khác framework với client directive khác nhau, giải thích cái giá & cách chia sẻ state." },
+    ]},
+  { num: "10", title: "Accessibility & Inclusive UI", sub: "Semantic HTML, ARIA, keyboard, screen reader",
+    color: "#d946ef", soft: "rgba(217,70,239,.10)",
+    lessons: [
+      { n: "10.01", title: "Semantic HTML & Accessibility Tree",
+        ctx: "App toàn div onClick. Screen reader đọc ra một mớ vô nghĩa, Tab không tới được. Gốc rễ đa số lỗi a11y là dùng sai thẻ.",
+        need: ["Accessibility tree là gì (browser sinh song song DOM cho công nghệ hỗ trợ)", "Dùng đúng element: <code>&lt;button&gt;</code> không phải div onClick; <code>&lt;a&gt;</code>; landmark/heading", "Element native tặng: focusable, keyboard, role, state"],
+        done: "Duyệt được một trang chỉ bằng bàn phím và mở a11y tree trong DevTools giải thích cấu trúc." },
+      { n: "10.02", title: "ARIA — và khi nào KHÔNG dùng",
+        ctx: "Bạn nghe 'thêm ARIA cho accessible' nên rắc role/aria-* khắp nơi — và làm nó tệ hơn.",
+        need: ["Quy tắc #1: đừng dùng ARIA nếu có HTML native làm được", "aria-label/labelledby/describedby/live (thông báo động)/expanded/selected", "ARIA chỉ đổi ngữ nghĩa, KHÔNG thêm hành vi (vẫn phải tự code keyboard)"],
+        done: "Giải thích được 'no ARIA is better than bad ARIA' và dùng aria-live cho một cập nhật động." },
+      { n: "10.03", title: "Keyboard Navigation & Focus Management",
+        ctx: "Mở modal nhưng focus vẫn ở dưới nền, Tab chạy ra sau modal, Esc không đóng. Lỗi a11y phổ biến nhất của component tương tác.",
+        need: ["Thứ tự Tab, tabindex (tabindex&gt;0 là anti-pattern)", "Focus trap trong modal, trả focus về trigger khi đóng, Esc để thoát", "Roving tabindex cho menu/list; skip-link"],
+        done: "Một modal tự viết quản focus đúng: trap khi mở, Esc đóng, trả focus về nút đã mở nó." },
+      { n: "10.04", title: "Screen Readers, Testing & WCAG",
+        ctx: "Bạn 'nghĩ' nó accessible nhưng chưa bao giờ nghe screen reader đọc app mình. Phải kiểm thật.",
+        need: ["Dùng thử screen reader (VoiceOver) duyệt app của bạn", "axe DevTools; eslint-plugin-jsx-a11y; keyboard-only; contrast", "WCAG thực dụng; form a11y (label, error liên kết aria-describedby)"],
+        done: "Chạy axe sạch lỗi trên một trang, và điều hướng form đó bằng screen reader + chỉ bàn phím." },
+    ]},
+  { num: "11", title: "Design Systems & Architecture at Scale", sub: "Component API, monorepo, micro-frontend, leadership",
+    color: "#e11d48", soft: "rgba(225,29,72,.10)",
+    lessons: [
+      { n: "11.01", title: "Component API Design & Composition",
+        ctx: "Một Button có 25 props (isPrimary, isLarge...) — mỗi nhu cầu mới lại thêm prop, không ai dùng nổi.",
+        need: ["Prop drilling vs compound components (<code>&lt;Select&gt;&lt;Select.Option/&gt;&lt;/Select&gt;</code>)", "Headless components (logic tách khỏi style — Radix/Headless UI)", "children/composition thay config prop bùng nổ; controlled vs uncontrolled API"],
+        done: "Thiết kế lại một component 'God-props' thành compound/headless mà vẫn linh hoạt hơn." },
+      { n: "11.02", title: "Design System Packaging & Docs",
+        ctx: "Đóng gói theme/tokens thành thư viện nhiều team import, versioning và tài liệu tử tế.",
+        need: ["Storybook: tài liệu sống + test tương tác + a11y addon", "Build ESM tree-shakable, semver, changelog, publish", "Token pipeline → Figma (Style Dictionary), giữ design & code đồng bộ"],
+        done: "Publish được một package component có Storybook, versioned, một team khác import dùng được." },
+      { n: "11.03", title: "Monorepo, Boundaries & Micro-frontends",
+        ctx: "5 team, 1 sản phẩm. Code chung ở đâu? Deploy độc lập thế nào? Sai kiến trúc → mọi thay đổi nhỏ phải build cả thế giới.",
+        need: ["Monorepo (Turborepo/Nx): package, ranh giới phụ thuộc, cache build, task graph", "Micro-frontends & Module Federation: khi nào đáng + cái giá", "Contract giữa các phần (types dùng chung, versioning API nội bộ)"],
+        done: "Biện hộ được monorepo vs micro-frontend cho một bối cảnh tổ chức cụ thể, có trade-off rõ." },
+      { n: "11.04", title: "Frontend System Design",
+        ctx: "'Thiết kế news feed / chat / autocomplete cho 10 triệu user' — câu hỏi phỏng vấn staff và cũng là công việc thật.",
+        need: ["Khung: yêu cầu → data model → API/giao tiếp → render → state → performance → a11y", "Case thật: infinite feed, autocomplete (debounce+cancel+cache), chat real-time", "Quản bộ nhớ/perf ở quy mô, đo bằng RUM"],
+        done: "Trình bày được thiết kế đầu-cuối cho một case, gọi tên trade-off ở mỗi lớp." },
+      { n: "11.05", title: "Technical Leadership",
+        ctx: "Phần 'không code' quyết định bạn có lên staff không: dẫn dắt quyết định, nâng cả team, quản nợ kỹ thuật.",
+        need: ["RFC / ADR: viết đề xuất kiến trúc để team phản biện; ghi lại 'vì sao'", "Văn hoá code review: review kiến trúc & khả năng bảo trì, không chỉ bắt lỗi", "Quản tech debt có chủ đích, estimation, mentor junior, dẫn dắt migration lớn"],
+        done: "Viết được một RFC cho một quyết định kỹ thuật thật (bối cảnh, phương án, trade-off, đề xuất)." },
+    ]},
+  { num: "12", title: "CSS & Layout Mastery", sub: "Flexbox/Grid, container queries, :has(), image handling",
+    color: "#3b82f6", soft: "rgba(59,130,246,.10)",
+    lessons: [
+      { n: "12.01", title: "Flexbox & Grid tới nơi",
+        ctx: "Bạn canh layout bằng margin/float/position chắp vá, responsive vỡ liên tục. Nhiều người chỉ dùng 20% sức mạnh của Flex/Grid.",
+        need: ["Flexbox: flex-grow/shrink/basis (hiểu <code>flex: 1</code> thực sự là gì), align/justify", "Grid: grid-template, fr, minmax(), auto-fit/auto-fill, grid-area", "Chọn Flex (1 chiều) vs Grid (2 chiều) đúng, không lạm dụng"],
+        done: "Dựng được layout dashboard phức tạp chỉ bằng Flex/Grid, không hack." },
+      { n: "12.02", title: "Responsive & Adaptive (fluid, không breakpoint cứng)",
+        ctx: "Bạn viết 5 media query cho 5 kích thước và vẫn vỡ ở giữa. CSS hiện đại làm responsive mượt hơn nhiều.",
+        need: ["Container queries — responsive theo container thay vì viewport", "Fluid: clamp()/min()/max() cho type/spacing co giãn mượt không breakpoint", "Logical properties (RTL), aspect-ratio, mobile-first"],
+        done: "Một card component tự thích ứng theo container và type co giãn mượt bằng clamp()." },
+      { n: "12.03", title: "Modern CSS (2026)",
+        ctx: "Bạn viết JS để làm việc CSS giờ đã làm được native (chọn parent, đóng gói scope). Bỏ lỡ = code thừa.",
+        need: ["<code>:has()</code> — 'parent selector', chọn theo con (thay nhiều JS)", "Cascade layers (<code>@layer</code>) — quản độ ưu tiên, hết chiến tranh specificity", "CSS nesting native, subgrid, :is()/:where(), custom properties nâng cao"],
+        done: "Thay được một đoạn JS bằng :has(), và dùng @layer để kiểm soát cascade thay vì !important." },
+      { n: "12.04", title: "Kiến trúc CSS & Styling Strategy",
+        ctx: "Codebase lớn, CSS phình, đè nhau, không ai dám xoá dòng nào vì sợ vỡ chỗ khác.",
+        need: ["So sánh BEM / CSS Modules / Tailwind / CSS-in-JS / zero-runtime", "Scoping, tránh global leak, dead-code elimination cho CSS", "Chọn theo quy mô team (nối design system)"],
+        done: "Biện hộ được lựa chọn styling strategy cho một dự án cụ thể với trade-off rõ ràng." },
+      { n: "12.05", title: "CSS Image Handling cơ bản",
+        ctx: "Ảnh bị méo, tràn khung, không canh giữa; background không vừa; avatar vuông thành méo. Việc hằng ngày mà nhiều người làm sai.",
+        need: ["<code>object-fit</code> (cover/contain/fill) + <code>object-position</code> — ảnh vừa khung không méo", "background-image + size/position; khi nào <code>&lt;img&gt;</code> (nội dung) vs background (trang trí)", "aspect-ratio chống CLS; ảnh responsive max-width:100%; sprite, filter, overlay"],
+        done: "Đặt ảnh bất kỳ vào khung cố định không méo/không tràn bằng object-fit, và chọn đúng img vs background." },
+    ]},
+  { num: "13", title: "Real-time, API & Auth mở rộng", sub: "Socket.IO, SSE, WebRTC, GraphQL, OAuth, WebAuthn",
+    color: "#22c55e", soft: "rgba(34,197,94,.10)",
+    lessons: [
+      { n: "13.01", title: "Socket.IO",
+        ctx: "WebSocket thô bạn phải tự lo reconnect, room, fallback, ack. Socket.IO đóng gói sẵn — nhưng thêm một lớp trừu tượng cần hiểu.",
+        need: ["Khác WS thô: auto-reconnect, rooms & namespaces, acknowledgement, fallback long-polling", "Kiến trúc room cho chat/notification; broadcast vs emit tới room", "Cái giá: không phải WS chuẩn, payload lớn hơn — khi nào dùng vs WS thô"],
+        done: "Dựng demo chat nhiều phòng với ack, và giải thích khi nào chọn Socket.IO thay vì WebSocket thô." },
+      { n: "13.02", title: "SSE & WebRTC",
+        ctx: "Server chỉ đẩy xuống (giá live, notification) → SSE gọn hơn. Còn video call/P2P → WebRTC.",
+        need: ["SSE (EventSource): 1 chiều server→client, tự reconnect, chạy HTTP thường", "WebRTC: P2P audio/video + data channel, signaling, STUN/TURN, ICE", "Bảng chọn: polling / SSE / WebSocket / Socket.IO / WebRTC"],
+        done: "Chọn đúng công nghệ real-time cho 4 tình huống khác nhau; dựng một luồng SSE chạy được." },
+      { n: "13.03", title: "GraphQL",
+        ctx: "REST trả over-fetch (thừa field) hoặc under-fetch (gọi nhiều endpoint). GraphQL cho client hỏi đúng cái cần.",
+        need: ["Query / Mutation / Subscription; schema, resolver (khái niệm)", "Apollo/urql: normalized cache, cache update sau mutation, optimistic", "Trade-off vs REST: caching phức tạp hơn, N+1, học phí cao"],
+        done: "Viết được query/mutation với biến, hiểu normalized cache, và nói được khi nào KHÔNG nên dùng GraphQL." },
+      { n: "13.04", title: "OAuth2 / OIDC / PKCE",
+        ctx: "'Đăng nhập với Google', SSO công ty. Tự chế sai rất dễ tạo lỗ hổng.",
+        need: ["OAuth2 (authorization) vs OIDC (authentication)", "Authorization Code + PKCE (flow đúng cho SPA/mobile, thay implicit)", "Access/refresh/ID token, lưu ở đâu, silent refresh, SSO"],
+        done: "Vẽ được sơ đồ Authorization Code + PKCE và giải thích vì sao SPA không dùng implicit flow nữa." },
+      { n: "13.05", title: "WebAuthn / Passkeys",
+        ctx: "Mật khẩu là điểm yếu bảo mật lớn nhất. 2026 xu hướng chuyển sang passkey (vân tay/Face ID, không mật khẩu).",
+        need: ["WebAuthn: navigator.credentials create/get, public-key crypto (private key ở thiết bị)", "Passkey chống phishing, chống rò rỉ DB; luồng đăng ký & xác thực", "Fallback & UX khi thiết bị không hỗ trợ"],
+        done: "Giải thích được vì sao passkey chống phishing (khác mật khẩu/OTP) và luồng WebAuthn cơ bản." },
+    ]},
+  { num: "14", title: "Testing chuyên sâu", sub: "Unit cơ chế, MSW, Playwright E2E, chiến lược",
+    color: "#eab308", soft: "rgba(234,179,8,.10)",
+    lessons: [
+      { n: "14.01", title: "Unit Testing cơ chế",
+        ctx: "Bạn viết test nhưng không hiểu expect, mock, fake timer hoạt động ra sao — nên khi test flaky hoặc mock sai là bí.",
+        need: ["Test runner: collect → run → assert → report; isolation, before/afterEach", "Mock vs stub vs spy (khác nhau ra sao), vi.fn(), mock module", "Fake timers (test debounce không chờ thật), fake Date, test async"],
+        done: "Test được một hàm dùng setTimeout bằng fake timer (không chờ thật), và giải thích mock/stub/spy." },
+      { n: "14.02", title: "Component & Integration + MSW",
+        ctx: "Test component gọi API — mock fetch bằng tay thì giòn và không giống thật. MSW chặn ở tầng network.",
+        need: ["RTL sâu: query role/label, userEvent (khác fireEvent), waitFor", "MSW (Mock Service Worker): intercept ở network level, dùng chung test + dev", "Integration: nhiều component + data layer làm việc cùng nhau"],
+        done: "Test một luồng 'load → hiển thị → tương tác → mutate' với MSW, không mock fetch thủ công." },
+      { n: "14.03", title: "E2E với Playwright",
+        ctx: "Unit/component xanh nhưng luồng thật vẫn vỡ (routing, auth, tích hợp). E2E chạy trên browser thật bắt những lỗi đó.",
+        need: ["Locator auto-wait (chống flaky), fixtures, expect retry, đa trình duyệt", "Network interception, storageState (login 1 lần), parallel & sharding", "Trace viewer debug CI, visual regression, chạy trong CI"],
+        done: "Một flow nghiệp vụ chính chạy E2E xanh trong CI, tái dùng auth state, và debug được bằng trace viewer." },
+      { n: "14.04", title: "Test Strategy & Architecture",
+        ctx: "Test suite chậm 30 phút, flaky, ai cũng ngại chạy → vô dụng. Chiến lược quan trọng hơn số lượng.",
+        need: ["Testing pyramid vs trophy (nhiều integration hơn cho FE hiện đại)", "Chống flaky test (timing, thứ tự, state chung), test độc lập", "Contract testing; khi nào KHÔNG test (đừng test framework/thư viện)"],
+        done: "Đề xuất được chiến lược test cho một dự án (tầng nào bao nhiêu, cái gì không test) và lý giải." },
+    ]},
+  { num: "15", title: "Animation & Graphics", sub: "Web Animations API, SVG, Canvas, image handling",
+    color: "#a855f7", soft: "rgba(168,85,247,.10)",
+    lessons: [
+      { n: "15.01", title: "Web Animations API & Animation Craft",
+        ctx: "CSS transition không đủ cho animation phức tạp (play/pause/seek, chuỗi động). WAAPI cho kiểm soát bằng JS mà vẫn chạy compositor.",
+        need: ["WAAPI: element.animate(), keyframes, timeline, play/pause/reverse/seek", "FLIP (First-Last-Invert-Play) — animate layout change mượt không reflow mỗi frame", "Spring/easing/stagger; View Transitions; prefers-reduced-motion; khi nào CSS/WAAPI/thư viện"],
+        done: "Làm một list reorder animate mượt bằng FLIP, và tôn trọng prefers-reduced-motion." },
+      { n: "15.02", title: "SVG chuyên sâu",
+        ctx: "Icon, biểu đồ, minh hoạ cần sắc nét ở mọi độ phân giải và animate được. Nhiều dev chỉ biết dán code.",
+        need: ["viewBox & coordinate system (gốc mọi hiểu lầm SVG), preserveAspectRatio", "path (M/L/C/A), stroke-dasharray (animate vẽ nét), gradient/mask/clip", "SVG sprite, SVGO, inline vs img vs background; a11y (title, role)"],
+        done: "Đọc/sửa được path SVG bằng tay, làm một icon animate 'vẽ nét', và biết khi nào inline vs sprite." },
+      { n: "15.03", title: "Canvas & Image Processing",
+        ctx: "Cần vẽ hàng nghìn phần tử (biểu đồ real-time, game, whiteboard) — DOM/SVG quá chậm. Canvas vẽ pixel trực tiếp.",
+        need: ["Canvas 2D: vẽ shape/text/image, transform, rAF loop", "Xử lý ảnh: getImageData, resize/crop/filter client-side, export blob", "Canvas vs SVG (retained vs immediate); OffscreenCanvas + Worker; WebGL/WebGPU"],
+        done: "Vẽ được một visualization động bằng canvas với rAF loop, và resize/nén một ảnh phía client bằng canvas." },
+      { n: "15.04", title: "Image Handling nâng cao (fallback · lazy · quick display)",
+        ctx: "Ảnh lỗi mạng → icon vỡ; lazy → khoảng trống rồi ảnh 'bụp' ra gây CLS; ảnh nặng → chờ lâu mới thấy gì.",
+        need: ["Xử lý lỗi tải: onerror → fallback/placeholder, retry", "Quick display: LQIP/blur-up, BlurHash, dominant-color — chống CLS", "Lazy + fetchpriority + decoding + skeleton; responsive DPR/sizes; fallback AVIF→WebP→JPEG"],
+        done: "Một ảnh có: placeholder blur hiện ngay, lazy load ngoài viewport, fallback khi lỗi, và không gây CLS." },
+    ]},
+  { num: "16", title: "Network, Adaptive Delivery & Platform", sub: "HTTP/1.1·2·3, adaptive loading, cross-tab, i18n",
+    color: "#0891b2", soft: "rgba(8,145,178,.10)",
+    lessons: [
+      { n: "16.01", title: "HTTP/1.1 → HTTP/2 → HTTP/3",
+        ctx: "Bạn từng nghe 'gộp file để giảm request' — đúng thời HTTP/1.1 nhưng có thể sai với HTTP/2. Hiểu tầng vận chuyển đổi cách tối ưu.",
+        need: ["HTTP/1.1: head-of-line blocking → thời đó phải bundle/sprite/domain-sharding", "HTTP/2: multiplexing + header compression → bớt cần bundle cực đoan", "HTTP/3 (QUIC/UDP): bỏ HoL blocking, reconnect nhanh khi đổi mạng (hợp mobile)"],
+        done: "Giải thích vì sao 'gộp mọi thứ vào 1 file' không còn tối ưu với HTTP/2, và HTTP/3 lợi gì cho mobile." },
+      { n: "16.02", title: "Adaptive Loading (mobile vs PC, theo mạng/thiết bị)",
+        ctx: "Điện thoại Android tầm trung trên 3G không nên tải cùng bundle/ảnh/video như PC.",
+        need: ["Network Information API (effectiveType, saveData), deviceMemory, hardwareConcurrency", "Ảnh/video chất lượng thấp cho mạng yếu, hoãn tính năng nặng, giảm animation khi saveData", "Responsive DPR, conditional import theo thiết bị, Client Hints; throttle mạng/CPU khi test"],
+        done: "App tải nhẹ hơn có kiểm chứng trên 3G/thiết bị yếu, dùng Network Information API." },
+      { n: "16.03", title: "Cross-tab & Background",
+        ctx: "User mở app ở 3 tab; đăng xuất tab này thì tab kia vẫn đăng nhập. Cần đồng bộ giữa tab và xử lý nền.",
+        need: ["BroadcastChannel — nhắn tin giữa các tab (auth/logout, theme); storage event", "Notifications API & Push API (nối Service Worker)", "Background Sync / Periodic Sync — gửi dữ liệu khi có mạng lại"],
+        done: "Logout ở một tab tự đăng xuất mọi tab qua BroadcastChannel; hiểu luồng push notification." },
+      { n: "16.04", title: "i18n Workflow (ngoài Intl API)",
+        ctx: "Intl API format được, nhưng dịch cả app (hàng nghìn chuỗi, số nhiều, ngữ cảnh) cần cả một quy trình.",
+        need: ["react-i18next / FormatJS: file dịch, namespace, lazy-load locale", "ICU message format: số nhiều (plural), giới tính, biến trong câu", "Tách chuỗi, key, fallback ngôn ngữ, RTL, test thiếu bản dịch"],
+        done: "App đổi ngôn ngữ runtime, chỉ tải locale đang dùng, và xử lý đúng số nhiều bằng ICU." },
+    ]},
+  { num: "17", title: "Advanced Specializations", sub: "WebAssembly, Local-first & CRDT, product engineering",
+    color: "#f43f5e", soft: "rgba(244,63,94,.10)",
+    lessons: [
+      { n: "17.01", title: "WebAssembly",
+        ctx: "Bước tiếp theo của 'xử lý dữ liệu nặng'. JS đã tối ưu vẫn không đủ nhanh cho: xử lý ảnh/video, mã hoá, parse khối lượng lớn.",
+        need: ["WASM: bytecode near-native từ Rust/C++/Go; KHÔNG thay JS mà bổ trợ", "Khi nào đáng: CPU-bound; khi nào KHÔNG (DOM, I/O)", "Tương tác JS↔WASM, chạy WASM trong Worker; ffmpeg.wasm, sql.js"],
+        done: "Giải thích được khi nào WASM thắng JS và khi nào không, và chạy một module WASM xử lý tác vụ nặng." },
+      { n: "17.02", title: "Local-first & CRDT",
+        ctx: "App kiểu Figma/Linear/Notion: chỉnh sửa offline, nhiều người cùng lúc, tự merge không xung đột, sync khi có mạng.",
+        need: ["Local-first: nguồn chân lý ở client, server chỉ để sync/backup", "CRDT tự merge không cần khoá — nguyên lý; Yjs/Automerge", "Sync engine, conflict resolution vs last-write-wins, offline queue + optimistic"],
+        done: "Giải thích vì sao CRDT merge không xung đột, và dựng demo 2 client sửa cùng document tự đồng bộ bằng Yjs." },
+      { n: "17.03", title: "Product Engineering (Flags · Experiment · Analytics)",
+        ctx: "Ship tính năng cho 100% user rồi mới biết nó tệ = rủi ro. Frontend cấp cao gắn với phân phối an toàn và đo lường.",
+        need: ["Feature flags: bật/tắt runtime, canary/gradual rollout, kill switch", "A/B testing: chia nhóm, đo lường, tránh hại CLS/perf", "Analytics/event tracking có chủ đích, privacy (consent, không PII), RUM"],
+        done: "Gate một tính năng sau feature flag với gradual rollout, và đặt event tracking tôn trọng privacy." },
+    ]},
+  { num: "18", title: "PWA, Offline, App & Extension", sub: "PWA, offline strategy, mobile app, browser extension",
+    color: "#7c3aed", soft: "rgba(124,58,237,.10)",
+    lessons: [
+      { n: "18.01", title: "PWA Fundamentals & Installability",
+        ctx: "Muốn app cài lên màn hình chính, mở toàn màn hình như native, có icon riêng — không qua app store.",
+        need: ["Manifest: name, icons (192/512 + maskable), display standalone, start_url, theme", "Điều kiện installable: manifest + Service Worker + HTTPS; beforeinstallprompt", "Lighthouse PWA audit; giới hạn iOS/Safari (không install prompt, storage giới hạn)"],
+        done: "App qua Lighthouse PWA, cài được lên home screen Android, và bạn biết rõ iOS thiếu gì." },
+      { n: "18.02", title: "Offline Strategy: cái gì nên offline & thế nào",
+        ctx: "Câu hỏi cốt lõi. Không phải mọi thứ nên offline — cần một ma trận quyết định theo loại dữ liệu.",
+        need: ["App shell/static → cache-first; dữ liệu đọc → stale-while-revalidate + IndexedDB + timestamp", "Mutation của user → offline queue + Background Sync; KHÔNG offline: giá real-time, thanh toán", "Optimistic UI offline + reconcile; network-first cho navigation (không kẹt bản cũ)"],
+        done: "Có ma trận offline cho app; một mutation tạo offline được queue rồi tự sync, không mất/không trùng." },
+      { n: "18.03", title: "Build cho App (mobile & desktop)",
+        ctx: "Sếp muốn 'app trên App Store / Play Store' từ codebase web. Nhiều đường, chi phí và đánh đổi rất khác nhau.",
+        need: ["PWA/TWA rẻ nhất (TWA lên Play Store); Capacitor bọc web + native API lên cả 2 store", "React Native native thật (chia sẻ logic, không chia sẻ DOM); Tauri/Electron desktop", "Tiêu chí chọn: cần bao nhiêu native, store policy, hiệu năng UI, kỹ năng team"],
+        done: "Cho một yêu cầu cụ thể, chọn được đường ship app và lý giải trade-off." },
+      { n: "18.04", title: "Browser Extension",
+        ctx: "Muốn build extension (Chrome/Edge/Firefox) áp dụng lại toàn bộ kiến thức FE trong môi trường có luật riêng.",
+        need: ["Manifest V3: background = service worker, content_scripts, popup, permissions tối thiểu", "Giao tiếp: content script ↔ background ↔ popup qua message passing; chrome.storage", "React/Vite cho popup, CSP nghiêm, publish store & review policy"],
+        done: "Build một extension nhỏ: popup (UI) + content script (chèn/sửa trang) + message passing." },
+    ]},
 ];
 
 const MILESTONES = [
@@ -611,17 +902,29 @@ let doneMap = load(KEY_DONE);
 let critMap = load(KEY_CRIT);
 
 const flatLessons = [];
-PHASES.forEach((p, pi) => p.lessons.forEach((l, li) => {
-  l.id = "p" + pi + "-" + li; l.pi = pi; l.li = li; l.color = p.color; l.soft = p.soft; l.phaseTitle = p.title; l.phaseNum = p.num;
-  flatLessons.push(l);
-}));
+PHASES.forEach((p, pi) => {
+  p.level = pi <= 5 ? 1 : pi <= 11 ? 2 : 3;
+  p.lessons.forEach((l, li) => {
+    l.id = "p" + pi + "-" + li; l.pi = pi; l.li = li; l.color = p.color; l.soft = p.soft; l.phaseTitle = p.title; l.phaseNum = p.num; l.level = p.level;
+    flatLessons.push(l);
+  });
+});
 const TOTAL = flatLessons.length;
 
 /* ---------- Sidebar render ---------- */
 const nav = document.getElementById("nav");
 function buildNav(){
   nav.innerHTML = "";
+  const LEVEL_LABEL = {1:"Level 1 · Nền tảng", 2:"Level 2 · Kiến trúc", 3:"Level 3 · Chuyên sâu"};
+  let lastLevel = 0;
   PHASES.forEach((p, pi) => {
+    if (p.level !== lastLevel) {
+      lastLevel = p.level;
+      const h = document.createElement("div");
+      h.className = "nav-level";
+      h.textContent = LEVEL_LABEL[p.level];
+      nav.appendChild(h);
+    }
     const item = document.createElement("div");
     item.className = "nav-item"; item.dataset.pi = pi;
     item.style.setProperty("--pc", p.color);
@@ -682,10 +985,26 @@ function openLesson(id){
   const item = nav.querySelector('.nav-item[data-pi="' + l.pi + '"]');
   if (item) item.classList.add("open");
 
-  const critState = critMap[id] || {};
-  const crit = l.crit.map((c, i) =>
-    `<label><input type="checkbox" data-i="${i}" ${critState[i] ? "checked" : ""}>
-       <span class="box">${CHECK}</span><span class="txt">${c}</span></label>`).join("");
+  const isBrief = Array.isArray(l.need);
+  let bodyHtml;
+  if (isBrief) {
+    bodyHtml =
+      block(ICON.ctx, l.color, "Bối cảnh", `<div class="context">${l.ctx}</div>`) +
+      block(ICON.goal, l.color, "Cần nắm", `<ul class="clean">${l.need.map(g=>`<li>${g}</li>`).join("")}</ul>`) +
+      block(ICON.crit, l.color, "Đã đủ khi", `<div class="donebox">${l.done}</div>`);
+  } else {
+    const critState = critMap[id] || {};
+    const crit = l.crit.map((c, i) =>
+      `<label><input type="checkbox" data-i="${i}" ${critState[i] ? "checked" : ""}>
+         <span class="box">${CHECK}</span><span class="txt">${c}</span></label>`).join("");
+    bodyHtml =
+      block(ICON.ctx, l.color, "Bối cảnh", `<div class="context">${l.ctx}</div>`) +
+      block(ICON.goal, l.color, "Mục tiêu", `<ul class="clean">${l.goals.map(g=>`<li>${g}</li>`).join("")}</ul>`) +
+      block(ICON.task, l.color, "Nhiệm vụ", `<ol class="tasks">${l.tasks.map(t=>`<li>${t}</li>`).join("")}</ol>`) +
+      block(ICON.hint, l.color, "Gợi ý", `<div class="hints"><ul>${l.hints.map(h=>`<li>${h}</li>`).join("")}</ul></div>`) +
+      block(ICON.crit, l.color, "Tiêu chí hoàn thành", `<div class="crit">${crit}</div>`) +
+      block(ICON.trap, "var(--warn)", "Bẫy thường gặp", `<div class="traps"><ul>${l.traps.map(t=>`<li>${t}</li>`).join("")}</ul></div>`);
+  }
 
   const prev = flatLessons[idx - 1], next = flatLessons[idx + 1];
   const navHtml = `<div class="lesson-nav">
@@ -698,14 +1017,9 @@ function openLesson(id){
   const isDone = !!doneMap[id];
   content.className = "content fade";
   content.innerHTML = `
-    <div class="lh-kicker"><span class="dot"></span>Phase ${l.phaseNum} · ${l.phaseTitle} · Bài ${l.n}</div>
+    <div class="lh-kicker"><span class="dot"></span>Level ${l.level} · Phase ${l.phaseNum} · ${l.phaseTitle} · Bài ${l.n}</div>
     <h2 class="lh-title">${l.title}</h2>
-    ${block(ICON.ctx, l.color, "Bối cảnh", `<div class="context">${l.ctx}</div>`)}
-    ${block(ICON.goal, l.color, "Mục tiêu", `<ul class="clean">${l.goals.map(g=>`<li>${g}</li>`).join("")}</ul>`)}
-    ${block(ICON.task, l.color, "Nhiệm vụ", `<ol class="tasks">${l.tasks.map(t=>`<li>${t}</li>`).join("")}</ol>`)}
-    ${block(ICON.hint, l.color, "Gợi ý", `<div class="hints"><ul>${l.hints.map(h=>`<li>${h}</li>`).join("")}</ul></div>`)}
-    ${block(ICON.crit, l.color, "Tiêu chí hoàn thành", `<div class="crit">${crit}</div>`)}
-    ${block(ICON.trap, "var(--warn)", "Bẫy thường gặp", `<div class="traps"><ul>${l.traps.map(t=>`<li>${t}</li>`).join("")}</ul></div>`)}
+    ${bodyHtml}
     <div class="mark-done ${isDone ? "is-done" : ""}">
       <button id="doneBtn">${isDone ? "✓ Đã hoàn thành" : "Đánh dấu đã hoàn thành"}</button>
       <span class="hint">Tiến độ lưu tại trình duyệt của bạn.</span>
@@ -738,20 +1052,21 @@ function openHome(){
     <div class="hero">
       <div class="hero-kicker">Lộ trình từ Mid · 4 năm → Senior · tư duy 10 năm</div>
       <h2>Hiểu <span class="grad">browser</span> trước,<br>framework sau.</h2>
-      <p>22 bài thực hành qua 6 phase. Mỗi bài là một tình huống thật: bối cảnh → mục tiêu → nhiệm vụ từng bước → gợi ý → tiêu chí → bẫy thường gặp. Chọn một bài ở thanh bên để bắt đầu.</p>
+      <p>${TOTAL} bài qua ${PHASES.length} phase · 3 level (Nền tảng → Kiến trúc → Chuyên sâu). Mỗi bài là một tình huống thật: bối cảnh → mục tiêu/cần nắm → nhiệm vụ → tiêu chí. Chọn một bài ở thanh bên để bắt đầu.</p>
     </div>
     <div class="rules">
       ${RULES.map(r=>`<div class="rule"><div class="n">${r[0]}</div><div class="t">${r[1]}</div><div class="d">${r[2]}</div></div>`).join("")}
     </div>
-    <div class="section-title">6 Phase</div>
-    <div class="phase-grid">
-      ${PHASES.map((p,pi)=>`<div class="pcard" style="--pc:${p.color}" data-pi="${pi}">
-        <div class="pnum">PHASE ${p.num}</div>
-        <h3>${p.title}</h3>
-        <div class="sub">${p.sub}</div>
-        <div class="cnt">${p.lessons.length} bài →</div>
+    ${[1,2,3].map(lv => `
+      <div class="section-title">Level ${lv} · ${({1:"Nền tảng browser & performance",2:"Kiến trúc & quy mô",3:"Chuyên sâu & đa nền tảng"})[lv]}</div>
+      <div class="phase-grid">
+        ${PHASES.map((p,pi)=>({p,pi})).filter(x=>x.p.level===lv).map(({p,pi})=>`<div class="pcard" style="--pc:${p.color}" data-pi="${pi}">
+          <div class="pnum">PHASE ${p.num}</div>
+          <h3>${p.title}</h3>
+          <div class="sub">${p.sub}</div>
+          <div class="cnt">${p.lessons.length} bài →</div>
+        </div>`).join("")}
       </div>`).join("")}
-    </div>
     <div class="section-title">Dự án xương sống</div>
     <div class="proj">
       <h3>Real-time Offline-first Dashboard</h3>
@@ -770,6 +1085,7 @@ function openHome(){
 /* ---------- Search ---------- */
 document.getElementById("search").addEventListener("input", e => {
   const q = e.target.value.trim().toLowerCase();
+  nav.querySelectorAll(".nav-level").forEach(h => { h.style.display = q ? "none" : ""; });
   nav.querySelectorAll(".nav-item").forEach(item => {
     let anyVisible = false;
     item.querySelectorAll(".lesson-btn").forEach(lb => {
