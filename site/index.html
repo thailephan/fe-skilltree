@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="FE Mastery">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <title>Frontend Mastery — Lý thuyết & Thực hành</title>
 <style>
   :root {
@@ -104,6 +105,11 @@
   .nav-level { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; padding: 15px 12px 5px; margin-top: 6px; border-top: 1px solid var(--line); }
   .nav-level:first-child { border-top: none; margin-top: 0; }
   .donebox { background: #edfcf3; border: 1px solid #b7eccb; border-left: 3px solid #16a34a; border-radius: 0 var(--radius) var(--radius) 0; padding: 14px 18px; font-size: 15px; color: #14683a; }
+  .sync-bar { margin-top: 12px; }
+  .sync-btn { width: 100%; font-family: var(--font-sans); font-size: 12.5px; font-weight: 650; cursor: pointer; border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); padding: 8px 10px; border-radius: 9px; transition: background .15s; }
+  .sync-btn:hover { background: var(--panel-2); }
+  .sync-on { font-size: 11.5px; color: #16a34a; font-weight: 650; display: block; margin-bottom: 6px; word-break: break-all; }
+  .sync-off { font-size: 10.5px; color: var(--ink-faint); line-height: 1.4; }
   .nav-item { margin-bottom: 2px; }
   .phase-btn {
     width: 100%; display: flex; align-items: center; gap: 10px;
@@ -897,7 +903,7 @@ const RULES = [
 const KEY_DONE = "fm-done-v1";
 const KEY_CRIT = "fm-crit-v1";
 function load(k){ try { return JSON.parse(localStorage.getItem(k)) || {}; } catch(e){ return {}; } }
-function save(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+function save(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} if(window.__fmSyncPush){ try{ window.__fmSyncPush(); }catch(e){} } }
 let doneMap = load(KEY_DONE);
 let critMap = load(KEY_CRIT);
 
@@ -1119,4 +1125,55 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(function () {});
   });
 }
+
+/* ---------- Supabase progress sync (optional; no-op if lib blocked, e.g. inside artifact CSP) ---------- */
+(function(){
+  var SB_URL = "https://gwwcdalgmnlfinpdfrtb.supabase.co";
+  var SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3d2NkYWxnbW5sZmlucGRmcnRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NzA1MjMsImV4cCI6MjEwNDU0NjUyM30.RNv7Mn1plTWkN6fIjzvvJ6d-2ZUKBP4i2oW9-cbLM_8";
+  var sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SB_URL, SB_ANON) : null;
+  var bar = document.createElement("div"); bar.className = "sync-bar";
+  var brand = document.querySelector(".brand"); if (brand) { brand.appendChild(bar); }
+  if (!sb) { bar.innerHTML = '<span class="sync-off">☁ Đồng bộ đám mây chỉ chạy trên bản deploy (Vercel), không chạy trong preview này.</span>'; return; }
+  var user = null, pushTimer = null;
+  function render(){
+    if (user) {
+      bar.innerHTML = '<span class="sync-on">☁ ' + (user.email || "đã đăng nhập") + '</span><button class="sync-btn" id="fmOut">Đăng xuất</button>';
+      document.getElementById("fmOut").onclick = function(){ sb.auth.signOut(); };
+    } else {
+      bar.innerHTML = '<button class="sync-btn" id="fmIn">☁ Đồng bộ tiến độ (đăng nhập)</button>';
+      document.getElementById("fmIn").onclick = signIn;
+    }
+  }
+  function signIn(){
+    var email = prompt("Nhập email để nhận magic link đăng nhập:");
+    if (!email) return;
+    sb.auth.signInWithOtp({ email: email, options: { emailRedirectTo: location.origin } }).then(function(r){
+      alert(r.error ? ("Lỗi: " + r.error.message) : ("Đã gửi link đăng nhập tới " + email + ". Mở email và bấm link để đồng bộ."));
+    });
+  }
+  function mergeRemote(remote){
+    remote = remote || {}; var rd = remote.done || {}, rc = remote.crit || {};
+    Object.keys(rd).forEach(function(k){ if (rd[k]) doneMap[k] = true; });
+    Object.keys(rc).forEach(function(k){ critMap[k] = Object.assign({}, rc[k] || {}, critMap[k] || {}); });
+    try { localStorage.setItem(KEY_DONE, JSON.stringify(doneMap)); localStorage.setItem(KEY_CRIT, JSON.stringify(critMap)); } catch(e){}
+    buildNav(); updateProgress();
+  }
+  function pull(){
+    if (!user) return;
+    sb.from("progress").select("done,crit").eq("user_id", user.id).maybeSingle().then(function(r){
+      if (r && r.data) mergeRemote(r.data);
+      doPush();
+    });
+  }
+  function doPush(){
+    if (!user) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function(){
+      sb.from("progress").upsert({ user_id: user.id, done: doneMap, crit: critMap, updated_at: new Date().toISOString() }).then(function(){}, function(){});
+    }, 800);
+  }
+  window.__fmSyncPush = doPush;
+  sb.auth.getSession().then(function(r){ user = ((r.data || {}).session || {}).user || null; render(); if (user) pull(); });
+  sb.auth.onAuthStateChange(function(_e, s){ user = (s || {}).user || null; render(); if (user) pull(); });
+})();
 </script>
